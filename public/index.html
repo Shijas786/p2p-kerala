@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,10 +9,21 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap');
-        body { font-family: 'Outfit', sans-serif; background: #0f172a; color: white; }
-        .glass { background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0f172a;
+            color: white;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
     </style>
 </head>
+
 <body class="bg-gradient-to-br from-slate-900 to-slate-950 min-h-screen text-white">
 
     <!-- Header -->
@@ -19,7 +31,8 @@
         <div class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
             🌴 P2P Kerala
         </div>
-        <a href="https://t.me/p2pkerala_bot" target="_blank" class="bg-emerald-500 hover:bg-emerald-600 px-5 py-2 rounded-full font-medium transition">
+        <a href="https://t.me/p2pkerala_bot" target="_blank"
+            class="bg-emerald-500 hover:bg-emerald-600 px-5 py-2 rounded-full font-medium transition">
             Launch Bot 🚀
         </a>
     </header>
@@ -34,7 +47,8 @@
             The safest P2P marketplace for Kerala. No KYC delays, 0.5% fees, and complete escrow protection.
         </p>
         <div class="flex justify-center gap-4">
-            <a href="https://t.me/p2pkerala_bot" class="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold text-lg transition transform hover:scale-105 shadow-lg shadow-emerald-500/20">
+            <a href="https://t.me/p2pkerala_bot"
+                class="bg-emerald-500 hover:bg-emerald-600 text-white px-8 py-4 rounded-xl font-bold text-lg transition transform hover:scale-105 shadow-lg shadow-emerald-500/20">
                 Start Trading Now
             </a>
             <a href="#stats" class="glass px-8 py-4 rounded-xl font-medium hover:bg-white/10 transition">
@@ -62,35 +76,72 @@
         </div>
     </div>
 
+    <!-- Live Market Feed -->
+    <div class="max-w-6xl mx-auto px-4 mb-20">
+        <div class="flex justify-between items-end mb-6">
+            <h2 class="text-3xl font-bold">📢 Live Market</h2>
+            <a href="https://t.me/p2pkerala_bot" class="text-emerald-400 hover:text-emerald-300 font-medium">View all on
+                Telegram &rarr;</a>
+        </div>
+
+        <div id="ads-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Loading Skeleton -->
+            <div class="glass p-6 rounded-2xl animate-pulse">
+                <div class="h-6 bg-slate-700 rounded w-1/3 mb-4"></div>
+                <div class="h-10 bg-slate-700 rounded w-1/2 mb-4"></div>
+                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
+            </div>
+            <div class="glass p-6 rounded-2xl animate-pulse hidden md:block">
+                <div class="h-6 bg-slate-700 rounded w-1/3 mb-4"></div>
+                <div class="h-10 bg-slate-700 rounded w-1/2 mb-4"></div>
+                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
+            </div>
+            <div class="glass p-6 rounded-2xl animate-pulse hidden lg:block">
+                <div class="h-6 bg-slate-700 rounded w-1/3 mb-4"></div>
+                <div class="h-10 bg-slate-700 rounded w-1/2 mb-4"></div>
+                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
+            </div>
+        </div>
+        <p id="no-ads-msg" class="text-center text-slate-500 mt-8 hidden">No active sell orders right now. Be the first
+            to sell!</p>
+    </div>
+
     <!-- Why Us -->
     <div class="max-w-6xl mx-auto px-4 grid md:grid-cols-2 gap-12 py-10">
         <div>
             <h2 class="text-3xl font-bold mb-6">Why trade with us?</h2>
             <div class="space-y-6">
                 <div class="flex gap-4">
-                    <div class="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-2xl">🛡️</div>
+                    <div class="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center text-2xl">🛡️
+                    </div>
                     <div>
                         <h3 class="text-xl font-bold">Escrow Protection</h3>
-                        <p class="text-slate-400">Funds are locked in a smart contract until payment is confirmed. Zero scams.</p>
+                        <p class="text-slate-400">Funds are locked in a smart contract until payment is confirmed. Zero
+                            scams.</p>
                     </div>
                 </div>
                 <div class="flex gap-4">
-                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-2xl">🤖</div>
+                    <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center text-2xl">🤖
+                    </div>
                     <div>
                         <h3 class="text-xl font-bold">AI Verified</h3>
-                        <p class="text-slate-400">Our AI validates payment screenshots instantly to prevent fake proofs.</p>
+                        <p class="text-slate-400">Our AI validates payment screenshots instantly to prevent fake proofs.
+                        </p>
                     </div>
                 </div>
                 <div class="flex gap-4">
-                    <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-2xl">⚡</div>
+                    <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center text-2xl">⚡
+                    </div>
                     <div>
                         <h3 class="text-xl font-bold">Lightning Fast</h3>
-                        <p class="text-slate-400">Powered by Base L2. Transactions confirm in seconds with near-zero gas fees.</p>
+                        <p class="text-slate-400">Powered by Base L2. Transactions confirm in seconds with near-zero gas
+                            fees.</p>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="glass p-8 rounded-3xl flex items-center justify-center bg-gradient-to-tr from-slate-900 to-slate-800">
+        <div
+            class="glass p-8 rounded-3xl flex items-center justify-center bg-gradient-to-tr from-slate-900 to-slate-800">
             <div class="text-center">
                 <div class="text-6xl mb-4">🤖</div>
                 <div class="text-2xl font-bold mb-2">Always Online</div>
@@ -109,7 +160,7 @@
             try {
                 const res = await fetch('/api/stats');
                 const data = await res.json();
-                
+
                 document.getElementById('stat-users').innerText = data.total_users || '-';
                 document.getElementById('stat-volume').innerText = '$' + (data.total_volume_usdc || 0).toLocaleString();
                 document.getElementById('stat-ads').innerText = data.active_orders || '-';
@@ -117,9 +168,65 @@
                 console.error("Failed to load stats", e);
             }
         }
+        }
+
+        async function fetchAds() {
+            try {
+                const res = await fetch('/api/ads');
+                const data = await res.json();
+                const container = document.getElementById('ads-container');
+                const noAdsMsg = document.getElementById('no-ads-msg');
+
+                if (!data.ads || data.ads.length === 0) {
+                    container.innerHTML = '';
+                    noAdsMsg.classList.remove('hidden');
+                    return;
+                }
+
+                noAdsMsg.classList.add('hidden');
+                container.innerHTML = data.ads.map(ad => `
+                    <div class="glass p-6 rounded-2xl border-l-4 border-emerald-500 hover:bg-white/5 transition group">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <div class="text-sm text-slate-400">Selling ${ad.token}</div>
+                                <div class="text-2xl font-bold text-white">${ad.amount} <span class="text-sm font-normal text-slate-400">${ad.token}</span></div>
+                            </div>
+                            <div class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold">
+                                ₹${ad.rate}
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
+                                ${ad.seller.username ? ad.seller.username[0].toUpperCase() : 'U'}
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-slate-200">@${ad.seller.username}</div>
+                                <div class="text-xs text-slate-500">Trust: ${ad.seller.trust_score}% • ${ad.seller.completed_trades} Deals</div>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-between items-center text-sm">
+                            <div class="text-slate-400">Limits: ₹${ad.min_limit} - ₹${ad.max_limit}</div>
+                        </div>
+
+                        <a href="https://t.me/p2pkerala_bot?start=buy_${ad.id}" target="_blank" 
+                           class="mt-4 block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-medium transition opacity-80 group-hover:opacity-100">
+                            Buy Now
+                        </a>
+                    </div>
+                `).join('');
+
+            } catch (e) {
+                console.error("Failed to load ads", e);
+            }
+        }
+
         fetchStats();
+        fetchAds();
         // Refresh every 30 seconds
-        setInterval(fetchStats, 30000);
+        setInterval(() => { fetchStats(); fetchAds(); }, 30000);
     </script>
 </body>
+
 </html>

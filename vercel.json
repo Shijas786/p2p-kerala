@@ -6,6 +6,10 @@
             "use": "@vercel/node"
         },
         {
+            "src": "api/ads.ts",
+            "use": "@vercel/node"
+        },
+        {
             "src": "public/**/*",
             "use": "@vercel/static"
         }
@@ -14,6 +18,10 @@
         {
             "source": "/api/stats",
             "destination": "/api/index.ts"
+        },
+        {
+            "source": "/api/ads",
+            "destination": "/api/ads.ts"
         },
         {
             "source": "/(.*)",
