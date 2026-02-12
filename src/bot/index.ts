@@ -932,6 +932,10 @@ bot.command("admin", async (ctx) => {
             escrow.getEscrowBalance()
         ]);
 
+        const keyboard = new InlineKeyboard()
+            .text("⚖️ View Active Disputes", "admin_disputes_list").row()
+            .text("🔄 Refresh Stats", "admin_stats_refresh");
+
         await ctx.reply(
             [
                 "⚙️ *Admin Dashboard*",
@@ -953,7 +957,7 @@ bot.command("admin", async (ctx) => {
                 "━━━━━━━━━━━━━━━━",
                 "Fees are sent to your wallet automatically upon release."
             ].join("\n"),
-            { parse_mode: "Markdown" }
+            { parse_mode: "Markdown", reply_markup: keyboard }
         );
     } catch (e) {
         console.error("Admin error:", e);
@@ -2107,6 +2111,72 @@ bot.on("callback_query:data", async (ctx) => {
             ].join("\n"),
             { parse_mode: "Markdown" }
         );
+    }
+
+    // Admin: List Disputes
+    if (data === "admin_disputes_list") {
+        if (!isAdmin(ctx)) return;
+        const disputes = await db.getDisputedTrades();
+
+        if (disputes.length === 0) {
+            await ctx.answerCallbackQuery({ text: "✅ No active disputes!" });
+            return;
+        }
+
+        const keyboard = new InlineKeyboard();
+        disputes.forEach(d => {
+            keyboard.text(`⚖️ Trade #${d.on_chain_trade_id || d.id.slice(0, 4)}`, `trade_view:${d.id}`).row();
+        });
+        keyboard.text("🔙 Back to Dashboard", "admin_stats_refresh");
+
+        await ctx.editMessageText("⚖️ *Active Disputes*\nSelect a trade to investigate:", {
+            parse_mode: "Markdown",
+            reply_markup: keyboard
+        });
+        await ctx.answerCallbackQuery();
+    }
+
+    // Admin: Refresh Stats (Also acts as Dashboard home)
+    if (data === "admin_stats_refresh") {
+        if (!isAdmin(ctx)) return;
+        try {
+            const [stats, relayerUsdc, relayerEth, contractFees] = await Promise.all([
+                db.getStats(),
+                escrow.getBalance(env.ADMIN_WALLET_ADDRESS),
+                wallet.getEthBalance(env.ADMIN_WALLET_ADDRESS),
+                escrow.getEscrowBalance()
+            ]);
+
+            const keyboard = new InlineKeyboard()
+                .text("⚖️ View Active Disputes", "admin_disputes_list").row()
+                .text("🔄 Refresh Stats", "admin_stats_refresh");
+
+            await ctx.editMessageText(
+                [
+                    "⚙️ *Admin Dashboard*",
+                    "",
+                    "📈 *System Stats*",
+                    `Users: ${stats.total_users}`,
+                    `Ads: ${stats.active_orders} active`,
+                    `Trades: ${stats.total_trades} (${stats.completed_trades} ok)`,
+                    `Volume: ${formatUSDC(stats.total_volume_usdc)}`,
+                    "",
+                    "💰 *Relayer Wallet*",
+                    `Address: \`${truncateAddress(env.ADMIN_WALLET_ADDRESS)}\``,
+                    `Balance: *${relayerUsdc} USDC*`,
+                    `Gas: *${relayerEth} ETH*`,
+                    "",
+                    "🏧 *Escrow Contract*",
+                    `Collected Fees: *${contractFees} USDC*`,
+                    "",
+                    "━━━━━━━━━━━━━━━━",
+                    "Fees are sent to your wallet automatically upon release."
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+        } catch (e) {
+            await ctx.answerCallbackQuery({ text: "❌ Refresh failed." });
+        }
     }
 
     // My Trades View Handler (Button)

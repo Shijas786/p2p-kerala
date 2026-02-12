@@ -1,5 +1,8 @@
 import { bot } from "./bot";
 import { env } from "./config/env";
+import { db } from "./db/client"; // Import DB for stats
+import express from "express";
+import path from "path";
 
 async function main() {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -21,14 +24,41 @@ async function main() {
     console.log("  Starting Telegram bot (long polling)...");
     console.log("");
 
-    // Start a simple health check server for cloud platforms (Koyeb/Render)
-    const http = require("http");
+    // Start Express Server (Website + Health Check)
+    const app = express();
     const port = process.env.PORT || 8000;
-    http.createServer((req: any, res: any) => {
-        res.writeHead(200, { "Content-Type": "text/plain" });
-        res.end("P2P Kerala Bot is running! 🚀");
-    }).listen(port);
-    console.log(`  🔗 Health check server live on port ${port}`);
+
+    // Serve static files from public folder
+    // Uses process.cwd() to be safe across dev/prod (Docker)
+    app.use(express.static(path.join(process.cwd(), "public")));
+
+    // API Stats Endpoint (Consumed by the frontend)
+    app.get("/api/stats", async (req, res) => {
+        try {
+            const stats = await db.getStats();
+            res.json({
+                total_users: stats.total_users,
+                total_volume_usdc: stats.total_volume_usdc || 0,
+                active_orders: stats.active_orders
+            });
+        } catch (e) {
+            console.error("API Error:", e);
+            res.status(500).json({ error: "Failed to fetch stats" });
+        }
+    });
+
+    // Health Check (Koyeb needs a 200 OK)
+    app.get("/health", (req, res) => res.send("OK"));
+
+    // Fallback file serving
+    app.get("*", (req, res) => {
+        res.sendFile(path.join(process.cwd(), "public", "index.html"));
+    });
+
+    app.listen(port, () => {
+        console.log(`  🔗 Website & Health server live on port ${port}`);
+        console.log(`  🌍 Visit http://localhost:${port} to see the landing page`);
+    });
 
     bot.start({
         onStart: (botInfo) => {
