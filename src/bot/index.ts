@@ -918,6 +918,50 @@ bot.command("profile", async (ctx) => {
 });
 
 // ═══════════════════════════════════════════════════════════════
+//                     /admin COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("admin", async (ctx) => {
+    if (!isAdmin(ctx)) return;
+
+    try {
+        const [stats, relayerUsdc, relayerEth, contractFees] = await Promise.all([
+            db.getStats(),
+            escrow.getBalance(env.ADMIN_WALLET_ADDRESS),
+            wallet.getEthBalance(env.ADMIN_WALLET_ADDRESS),
+            escrow.getEscrowBalance()
+        ]);
+
+        await ctx.reply(
+            [
+                "⚙️ *Admin Dashboard*",
+                "",
+                "📈 *System Stats*",
+                `Users: ${stats.total_users}`,
+                `Ads: ${stats.active_orders} active`,
+                `Trades: ${stats.total_trades} (${stats.completed_trades} ok)`,
+                `Volume: ${formatUSDC(stats.total_volume_usdc)}`,
+                "",
+                "💰 *Relayer Wallet*",
+                `Address: \`${truncateAddress(env.ADMIN_WALLET_ADDRESS)}\``,
+                `Balance: *${relayerUsdc} USDC*`,
+                `Gas: *${relayerEth} ETH*`,
+                "",
+                "🏧 *Escrow Contract*",
+                `Collected Fees: *${contractFees} USDC*`,
+                "",
+                "━━━━━━━━━━━━━━━━",
+                "Fees are sent to your wallet automatically upon release."
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+    } catch (e) {
+        console.error("Admin error:", e);
+        await ctx.reply("❌ Failed to load admin stats.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
 //                     /bridge COMMAND
 // ═══════════════════════════════════════════════════════════════
 
@@ -1614,7 +1658,7 @@ bot.on("callback_query:data", async (ctx) => {
         const order = await db.getOrderById(orderId);
 
         if (!order || order.status !== "active") {
-            await ctx.answerCallbackQuery({ text: "Order not available!" });
+            await ctx.answerCallbackQuery({ text: "Order no longer active!" });
             return;
         }
 
@@ -1626,19 +1670,39 @@ bot.on("callback_query:data", async (ctx) => {
 
         try {
             if (order.type === "sell") {
-                await ctx.editMessageText("⏳ Initiating trade on blockchain...");
+                await ctx.editMessageText("⏳ Initiating trade... checking seller balance.");
+
+                // 1. Double check seller still has the tokens in their bot wallet (Safety against drains)
+                const seller = await db.getUserById(order.user_id);
+                if (!seller || !seller.wallet_address) throw new Error("Seller wallet not found.");
+
+                const sellerBalance = await escrow.getBalance(seller.wallet_address);
+                if (parseFloat(sellerBalance) < order.amount) {
+                    await db.updateOrder(order.id, { status: "paused" });
+                    await ctx.editMessageText("❌ Trade failed: Seller no longer has sufficient balance. Ad has been paused.");
+                    return;
+                }
+
+                // 2. Atomic fill check (Race condition protection)
+                const filled = await db.fillOrder(order.id, order.amount);
+                if (!filled) {
+                    await ctx.editMessageText("❌ Trade failed: Someone else just matched this ad.");
+                    return;
+                }
+
+                await ctx.editMessageText("⏳ Locking crypto in escrow contract...");
 
                 const tokenSymbol = order.token || "USDC";
                 const tokenAddress = tokenSymbol === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS;
 
-                // 1. Relayer creates trade on Smart Contract (moves funds to contract)
+                // 3. Relayer creates trade on Smart Contract
                 const { txHash, tradeId } = await wallet.relayerCreateTrade(
                     user.wallet_address!, // Buyer address
                     order.amount,
                     tokenAddress
                 );
 
-                // 2. Create local Trade record
+                // 4. Create local Trade record
                 const trade = await db.createTrade({
                     order_id: order.id,
                     buyer_id: user.id,
@@ -1652,26 +1716,22 @@ bot.on("callback_query:data", async (ctx) => {
                     fee_amount: order.amount * env.FEE_PERCENTAGE,
                     fee_percentage: env.FEE_PERCENTAGE,
                     buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
-                    payment_method: "UPI", // Default/Placeholder
+                    payment_method: "UPI",
                     status: "in_escrow",
                     on_chain_trade_id: tradeId,
                     escrow_tx_hash: txHash,
                     created_at: new Date().toISOString(),
                 });
 
-                // 3. Mark Order as Filled/Closed
-                await db.updateOrder(order.id, { status: "filled", filled_amount: order.amount });
-
                 await ctx.editMessageText(
                     `✅ Trade Started! Trade #${tradeId}\nCheck /mytrades to proceed with payment.`
                 );
 
                 // Notify Seller
-                const seller = await db.getUserById(order.user_id);
-                if (seller && seller.telegram_id) {
+                if (seller.telegram_id) {
                     await ctx.api.sendMessage(
                         seller.telegram_id,
-                        `🔔 *New Trade Started!*\n\nBuyer matches your ad for ${formatUSDC(order.amount)}.\nThey will send payment soon.\n\nCheck /mytrades to monitor status.`,
+                        `🔔 *New Trade Started!*\n\nBuyer matches your ad for ${formatUSDC(order.amount, order.token)}.\nThey will send payment soon.\n\nCheck /mytrades to monitor status.`,
                         { parse_mode: "Markdown" }
                     );
                 }
@@ -1971,10 +2031,16 @@ bot.on("callback_query:data", async (ctx) => {
             if (buyer && buyer.telegram_id) {
                 await ctx.api.sendMessage(
                     buyer.telegram_id,
-                    `✅ *Trade Completed!*\n\nSeller has released ${formatUSDC(trade.amount)} USDC.\nThe funds are now in your wallet (smart contract release).\n\nTransaction: [View on BaseScan](${escrow.getExplorerUrl(txHash)})`,
+                    `✅ *Trade Completed!*\n\nSeller has released ${formatUSDC(trade.amount, trade.token)}.\nThe funds are now in your wallet (smart contract release).\n\nTransaction: [View on BaseScan](${escrow.getExplorerUrl(txHash)})`,
                     { parse_mode: "Markdown" }
                 );
             }
+
+            // Update stats & Trust Scores
+            await Promise.all([
+                db.completeUserTrade(trade.seller_id, true),
+                db.completeUserTrade(trade.buyer_id, true)
+            ]);
 
         } catch (error) {
             console.error("Release failed:", error);
@@ -1987,6 +2053,60 @@ bot.on("callback_query:data", async (ctx) => {
         const tradeId = data.replace("trade_dispute:", "");
         await db.updateTrade(tradeId, { status: "disputed" });
         await ctx.editMessageText("⚠️ Dispute opened. Support will review this case.");
+
+        // Notify Admins
+        const admins = env.ADMIN_IDS;
+        for (const adminId of admins) {
+            const kb = new InlineKeyboard()
+                .text("⚖️ Resolve (Release)", `resolve:${tradeId}:buyer`).row()
+                .text("🔁 Resolve (Refund)", `resolve:${tradeId}:seller`).row()
+                .text("🤖 AI Analysis", `ai_analyze_dispute:${tradeId}`);
+
+            await ctx.api.sendMessage(adminId, `🚨 *New Dispute Raised!*\nTrade: \`${tradeId}\`\nPlease review carefully.`, {
+                parse_mode: "Markdown",
+                reply_markup: kb
+            });
+        }
+    }
+
+    // AI Dispute Analysis
+    if (data.startsWith("ai_analyze_dispute:")) {
+        if (!isAdmin(ctx)) return;
+        const tradeId = data.replace("ai_analyze_dispute:", "");
+        const trade = await db.getTradeById(tradeId);
+        if (!trade) return;
+
+        await ctx.answerCallbackQuery({ text: "🤖 AI is analyzing evidence..." });
+
+        const [buyer, seller] = await Promise.all([
+            db.getUserById(trade.buyer_id),
+            db.getUserById(trade.seller_id)
+        ]);
+
+        const analysis = await ai.analyzeDispute({
+            tradeAmount: trade.amount,
+            fiatAmount: trade.fiat_amount,
+            buyerName: buyer?.username || "Anon",
+            sellerName: seller?.username || "Anon",
+            buyerTrades: buyer?.trade_count || 0,
+            sellerTrades: seller?.trade_count || 0,
+            buyerTrustScore: buyer?.trust_score || 0,
+            sellerTrustScore: seller?.trust_score || 0,
+            reason: "User raised dispute (auto-check)",
+            evidence: [] // In production, we'd pass payment proof analysis here
+        });
+
+        await ctx.reply(
+            [
+                "🤖 *AI Dispute Analysis*",
+                "",
+                `Recommendation: *${analysis.recommendation.toUpperCase()}*`,
+                `Confidence: ${Math.round(analysis.confidence * 100)}%`,
+                "",
+                `Reasoning: _${analysis.reasoning}_`,
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
     }
 
     // My Trades View Handler (Button)
@@ -2594,25 +2714,58 @@ bot.on("message:photo", async (ctx) => {
     const user = await ensureUser(ctx);
 
     if (ctx.session.current_trade_id) {
-        // Save the photo as payment proof
-        const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Highest resolution
-        const fileId = photo.file_id;
+        const trade = await db.getTradeById(ctx.session.current_trade_id);
+        if (!trade) return;
 
-        await ctx.reply(
+        // Highest resolution
+        const photo = ctx.message.photo[ctx.message.photo.length - 1];
+        const file = await ctx.api.getFile(photo.file_id);
+        const fileUrl = `https://api.telegram.org/file/bot${env.TELEGRAM_BOT_TOKEN}/${file.file_path}`;
+
+        const statusMsg = await ctx.reply("📸 *Analyzing payment proof with AI...*", { parse_mode: "Markdown" });
+
+        // AI Vision Analysis
+        const analysis = await ai.analyzePaymentProof(
+            fileUrl,
+            trade.fiat_amount,
+            trade.payment_method === "UPI" ? (user.upi_id || "Seller") : "Seller"
+        );
+
+        let verificationText = "";
+        if (analysis.confidence > 0.7) {
+            if (analysis.amountMatch && analysis.status === "success") {
+                verificationText = "✅ *AI Verification:* Payment appears valid.";
+            } else {
+                verificationText = `⚠️ *AI Warning:* ${analysis.reason || "Details do not perfectly match."}`;
+            }
+        }
+
+        await ctx.api.editMessageText(
+            ctx.chat.id,
+            statusMsg.message_id,
             [
                 "📸 *Payment proof received!*",
                 "",
-                `Trade: \`${ctx.session.current_trade_id.slice(0, 8)}\``,
-                `File saved: ✅`,
+                `Trade: \`#${trade.on_chain_trade_id || trade.id.slice(0, 4)}\``,
+                verificationText,
                 "",
-                "The seller will be notified.",
-                "If they don't respond within 45 minutes, your crypto will be auto-released.",
+                "The seller has been notified to check their account.",
+                "If they don't respond within 45 minutes, crypto will be auto-released.",
             ].join("\n"),
             { parse_mode: "Markdown" }
         );
+
+        // Notify Seller
+        const seller = await db.getUserById(trade.seller_id);
+        if (seller && seller.telegram_id) {
+            await ctx.api.sendPhoto(seller.telegram_id, photo.file_id, {
+                caption: `📸 *Payment Proof Attached!*\n\nBuyer says they paid ₹${trade.fiat_amount}.\n${verificationText}`,
+                parse_mode: "Markdown"
+            });
+        }
     } else {
         await ctx.reply(
-            "📸 Got your photo! If this is a payment proof, first start a trade and then send the proof."
+            "📸 Got your photo! If this is a payment proof, first open the trade in /mytrades and then send the proof."
         );
     }
 });

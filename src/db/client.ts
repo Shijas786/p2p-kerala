@@ -94,6 +94,27 @@ class Database {
             .eq("id", userId);
     }
 
+    async completeUserTrade(userId: string, isSuccessful: boolean): Promise<void> {
+        const user = await this.getUserById(userId);
+        if (!user) return;
+
+        const newTradeCount = (user.trade_count || 0) + 1;
+        const newCompletedCount = (user.completed_trades || 0) + (isSuccessful ? 1 : 0);
+
+        let newTrust = (user.trust_score || 0);
+        if (isSuccessful) {
+            newTrust = Math.min(100, newTrust + 5);
+        } else {
+            newTrust = Math.max(0, newTrust - 20);
+        }
+
+        await this.updateUser(userId, {
+            trade_count: newTradeCount,
+            completed_trades: newCompletedCount,
+            trust_score: newTrust
+        });
+    }
+
     async getAllTelegramIds(): Promise<number[]> {
         const db = this.getClient();
         const { data } = await db.from("users").select("telegram_id");
@@ -170,6 +191,38 @@ class Database {
             .from("orders")
             .update({ ...updates, updated_at: new Date().toISOString() })
             .eq("id", orderId);
+    }
+
+    /**
+     * Atomically fill an order to prevent double-matching
+     */
+    async fillOrder(orderId: string, amount: number): Promise<boolean> {
+        const db = this.getClient();
+
+        // 1. Get current order with lock-like check
+        const { data: order } = await db
+            .from("orders")
+            .select("*")
+            .eq("id", orderId)
+            .eq("status", "active")
+            .single();
+
+        if (!order) return false;
+
+        const newFilled = order.filled_amount + amount;
+        const newStatus = newFilled >= order.amount ? "filled" : "active";
+
+        const { error } = await db
+            .from("orders")
+            .update({
+                filled_amount: newFilled,
+                status: newStatus,
+                updated_at: new Date().toISOString()
+            })
+            .eq("id", orderId)
+            .eq("status", "active"); // Double check status hasn't changed
+
+        return !error;
     }
 
     async cancelOrder(orderId: string): Promise<void> {
