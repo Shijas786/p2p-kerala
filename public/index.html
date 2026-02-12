@@ -31,10 +31,10 @@
         <div class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">
             🌴 P2P Kerala
         </div>
-        <a href="https://t.me/p2pkerala_bot" target="_blank"
-            class="bg-emerald-500 hover:bg-emerald-600 px-5 py-2 rounded-full font-medium transition">
-            Launch Bot 🚀
-        </a>
+        <div id="auth-section" class="flex items-center gap-4">
+            <!-- Checking auth state... -->
+            <div class="animate-pulse bg-slate-800 w-24 h-10 rounded-full"></div>
+        </div>
     </header>
 
     <!-- Hero -->
@@ -268,10 +268,61 @@
             }
         }
 
-        fetchStats();
-        fetchAds();
-        // Refresh every 30 seconds
-        setInterval(() => { fetchStats(); fetchAds(); }, 30000);
+        // Auth Logic
+        async function checkAuth() {
+            const user = localStorage.getItem('p2pkerala_user');
+            const authSection = document.getElementById('auth-section');
+
+            if (user) {
+                // User is logged in
+                const userData = JSON.parse(user);
+                authSection.innerHTML = `
+                    <a href="/dashboard.html" class="bg-emerald-500 hover:bg-emerald-600 px-5 py-2 rounded-full font-medium transition flex items-center gap-2">
+                        <img src="${userData.photo_url || 'https://ui-avatars.com/api/?name=' + userData.first_name}" class="w-6 h-6 rounded-full border border-white/20">
+                        Dashboard
+                    </a>
+                `;
+            } else {
+                // Show Login Button
+                authSection.innerHTML = `
+                    <script async src="https://telegram.org/js/telegram-widget.js?22" 
+                            data-telegram-login="P2PKerala_basebot" 
+                            data-size="medium" 
+                            data-onauth="onTelegramAuth(user)" 
+                            data-request-access="write"></script>
+    `;
+    }
+    }
+
+    // Callback from Telegram Widget
+    async function onTelegramAuth(user) {
+    // Verify with our backend
+    try {
+    const res = await fetch('/api/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(user)
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+    localStorage.setItem('p2pkerala_user', JSON.stringify(data.user));
+    window.location.href = '/dashboard.html';
+    } else {
+    alert('Login failed: ' + data.error);
+    }
+    } catch (e) {
+    console.error("Auth error", e);
+    alert('Login failed. Please try again.');
+    }
+    }
+
+    // Initialize
+    checkAuth();
+    fetchStats();
+    fetchAds();
+    setInterval(() => { fetchStats(); fetchAds(); }, 30000);
     </script>
 </body>
 

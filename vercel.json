@@ -10,6 +10,14 @@
             "use": "@vercel/node"
         },
         {
+            "src": "api/auth.ts",
+            "use": "@vercel/node"
+        },
+        {
+            "src": "api/trades.ts",
+            "use": "@vercel/node"
+        },
+        {
             "src": "public/**/*",
             "use": "@vercel/static"
         }
@@ -22,6 +30,14 @@
         {
             "source": "/api/ads",
             "destination": "/api/ads.ts"
+        },
+        {
+            "source": "/api/auth",
+            "destination": "/api/auth.ts"
+        },
+        {
+            "source": "/api/trades",
+            "destination": "/api/trades.ts"
         },
         {
             "source": "/(.*)",
