@@ -1,0 +1,345 @@
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { env } from "../config/env";
+import type { User, Order, Trade, PaymentProof } from "../types";
+
+class Database {
+    private client: SupabaseClient | null = null;
+
+    private getClient(): SupabaseClient {
+        if (!this.client) {
+            if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+                throw new Error("Supabase credentials not configured");
+            }
+            this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+        }
+        return this.client;
+    }
+
+    // ═══════════════════════════════════════
+    //              USERS
+    // ═══════════════════════════════════════
+
+    async getOrCreateUser(telegramId: number, username?: string, firstName?: string): Promise<User> {
+        const db = this.getClient();
+
+        // Try to find existing user
+        const { data: existing } = await db
+            .from("users")
+            .select("*")
+            .eq("telegram_id", telegramId)
+            .single();
+
+        if (existing) {
+            // Update username/first_name if changed
+            if (username !== existing.username || firstName !== existing.first_name) {
+                await db
+                    .from("users")
+                    .update({ username, first_name: firstName, updated_at: new Date().toISOString() })
+                    .eq("telegram_id", telegramId);
+            }
+            return existing as User;
+        }
+
+        // Create new user with unique wallet index
+        // Find current max index to assign next one
+        const { data: lastUser } = await db
+            .from("users")
+            .select("wallet_index")
+            .order("wallet_index", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        const nextIndex = lastUser ? lastUser.wallet_index + 1 : 1; // Start from 1? 0 is admin? 
+
+        const { data: newUser, error } = await db
+            .from("users")
+            .insert({
+                telegram_id: telegramId,
+                username: username || null,
+                first_name: firstName || null,
+                wallet_index: nextIndex
+            })
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to create user: ${error.message}`);
+        return newUser as User;
+    }
+
+    async getUserByTelegramId(telegramId: number): Promise<User | null> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("users")
+            .select("*")
+            .eq("telegram_id", telegramId)
+            .single();
+        return data as User | null;
+    }
+
+    async getUserById(userId: string): Promise<User | null> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("users")
+            .select("*")
+            .eq("id", userId)
+            .single();
+        return data as User | null;
+    }
+
+    async updateUser(userId: string, updates: Partial<User>): Promise<void> {
+        const db = this.getClient();
+        await db
+            .from("users")
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq("id", userId);
+    }
+
+    async getAllTelegramIds(): Promise<number[]> {
+        const db = this.getClient();
+        const { data } = await db.from("users").select("telegram_id");
+        return (data || []).map((u: any) => u.telegram_id);
+    }
+
+    // ═══════════════════════════════════════
+    //              ORDERS
+    // ═══════════════════════════════════════
+
+    async createOrder(order: Partial<Order>): Promise<Order> {
+        const db = this.getClient();
+        const { data, error } = await db
+            .from("orders")
+            .insert(order)
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to create order: ${error.message}`);
+        return data as Order;
+    }
+
+    async getActiveOrders(type?: string, token?: string, limit = 20): Promise<Order[]> {
+        const db = this.getClient();
+        let query = db
+            .from("orders")
+            .select("*, users!inner(username, trust_score, completed_trades)")
+            .eq("status", "active")
+            .order("rate", { ascending: type === "sell" })
+            .limit(limit);
+
+        if (token && token !== "all") {
+            query = query.eq("token", token);
+        }
+
+        if (type) {
+            query = query.eq("type", type);
+        }
+
+        const { data, error } = await query;
+        if (error) throw new Error(`Failed to get orders: ${error.message}`);
+
+        return (data || []).map((d: any) => ({
+            ...d,
+            username: d.users?.username,
+            trust_score: d.users?.trust_score,
+        })) as Order[];
+    }
+
+    async getOrderById(orderId: string): Promise<Order | null> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("orders")
+            .select("*, users!inner(username, trust_score)")
+            .eq("id", orderId)
+            .single();
+        return data as Order | null;
+    }
+
+    async getUserOrders(userId: string): Promise<Order[]> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("orders")
+            .select("*")
+            .eq("user_id", userId)
+            .in("status", ["active", "paused"])
+            .order("created_at", { ascending: false });
+        return (data || []) as Order[];
+    }
+
+    async updateOrder(orderId: string, updates: Partial<Order>): Promise<void> {
+        const db = this.getClient();
+        await db
+            .from("orders")
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq("id", orderId);
+    }
+
+    async cancelOrder(orderId: string): Promise<void> {
+        await this.updateOrder(orderId, { status: "cancelled" });
+    }
+
+    // ═══════════════════════════════════════
+    //              TRADES
+    // ═══════════════════════════════════════
+
+    async createTrade(trade: Partial<Trade>): Promise<Trade> {
+        const db = this.getClient();
+        const { data, error } = await db
+            .from("trades")
+            .insert(trade)
+            .select()
+            .single();
+
+        if (error) throw new Error(`Failed to create trade: ${error.message}`);
+        return data as Trade;
+    }
+
+    async getTradeById(tradeId: string): Promise<Trade | null> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("trades")
+            .select("*")
+            .eq("id", tradeId)
+            .single();
+        return data as Trade | null;
+    }
+
+    async getUserTrades(userId: string, limit = 10): Promise<Trade[]> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("trades")
+            .select("*")
+            .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+            .order("created_at", { ascending: false })
+            .limit(limit);
+        return (data || []) as Trade[];
+    }
+
+    async getActiveTrades(): Promise<Trade[]> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("trades")
+            .select("*")
+            .in("status", ["matched", "in_escrow", "fiat_sent", "fiat_confirmed"])
+            .order("created_at", { ascending: true });
+        return (data || []) as Trade[];
+    }
+
+    async getDisputedTrades(): Promise<Trade[]> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("trades")
+            .select("*")
+            .eq("status", "disputed")
+            .order("created_at", { ascending: true });
+        return (data || []) as Trade[];
+    }
+
+    async updateTrade(tradeId: string, updates: Partial<Trade>): Promise<void> {
+        const db = this.getClient();
+        await db
+            .from("trades")
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq("id", tradeId);
+    }
+
+    async getTradesNeedingAutoRelease(): Promise<Trade[]> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("trades")
+            .select("*")
+            .eq("status", "fiat_sent")
+            .lt("auto_release_at", new Date().toISOString())
+            .not("auto_release_at", "is", null);
+        return (data || []) as Trade[];
+    }
+
+    async getExpiredEscrows(): Promise<Trade[]> {
+        const db = this.getClient();
+        const now = new Date().toISOString();
+        const { data } = await db
+            .from("trades")
+            .select("*")
+            .eq("status", "in_escrow")
+            .lt("created_at", new Date(Date.now() - parseInt(env.ESCROW_TIMEOUT_SECONDS) * 1000).toISOString());
+        return (data || []) as Trade[];
+    }
+
+    // ═══════════════════════════════════════
+    //          PAYMENT PROOFS
+    // ═══════════════════════════════════════
+
+    async savePaymentProof(proof: Partial<PaymentProof>): Promise<void> {
+        const db = this.getClient();
+        await db.from("payment_proofs").insert(proof);
+    }
+
+    async isUTRUsed(utr: string, excludeTradeId?: string): Promise<boolean> {
+        const db = this.getClient();
+        let query = db
+            .from("payment_proofs")
+            .select("id")
+            .eq("utr", utr);
+
+        if (excludeTradeId) {
+            query = query.neq("trade_id", excludeTradeId);
+        }
+
+        const { data } = await query;
+        return (data || []).length > 0;
+    }
+
+    // ═══════════════════════════════════════
+    //              FEES
+    // ═══════════════════════════════════════
+
+    async recordFee(tradeId: string, amount: number, txHash?: string): Promise<void> {
+        const db = this.getClient();
+        await db.from("fees").insert({
+            trade_id: tradeId,
+            amount,
+            token: "USDC",
+            chain: "base",
+            tx_hash: txHash,
+        });
+    }
+
+    async getTotalFees(): Promise<number> {
+        const db = this.getClient();
+        const { data } = await db.from("fees").select("amount");
+        return (data || []).reduce((sum: number, f: any) => sum + f.amount, 0);
+    }
+
+    // ═══════════════════════════════════════
+    //              STATS
+    // ═══════════════════════════════════════
+
+    async getStats() {
+        const db = this.getClient();
+        const [trades, orders, users, fees, disputes] = await Promise.all([
+            db.from("trades").select("id, status, amount", { count: "exact" }),
+            db.from("orders").select("id", { count: "exact" }).eq("status", "active"),
+            db.from("users").select("id", { count: "exact" }),
+            this.getTotalFees(),
+            db.from("trades").select("id", { count: "exact" }).eq("status", "disputed"),
+        ]);
+
+        const completedTrades = (trades.data || []).filter(
+            (t: any) => t.status === "completed"
+        );
+        const totalVolume = completedTrades.reduce(
+            (sum: number, t: any) => sum + (t.amount || 0),
+            0
+        );
+
+        return {
+            total_trades: trades.count || 0,
+            completed_trades: completedTrades.length,
+            active_orders: orders.count || 0,
+            total_users: users.count || 0,
+            total_volume_usdc: totalVolume,
+            total_fees_collected: fees,
+            active_disputes: disputes.count || 0,
+        };
+    }
+}
+
+export const db = new Database();

@@ -1,0 +1,2628 @@
+import { Bot, Context, session, InlineKeyboard } from "grammy";
+import { env } from "../config/env";
+import { db } from "../db/client";
+import { ai } from "../services/ai";
+import { escrow } from "../services/escrow";
+import { bridge } from "../services/bridge";
+import { wallet } from "../services/wallet";
+import { groupManager } from "../utils/groupManager";
+import {
+    formatOrder,
+    formatINR,
+    formatUSDC,
+    formatTradeStatus,
+    formatTimeRemaining,
+    truncateAddress,
+} from "../utils/formatters";
+import type { SessionData, User } from "../types";
+
+// ═══════════════════════════════════════════════════════════════
+//                      BOT SETUP
+// ═══════════════════════════════════════════════════════════════
+
+type BotContext = Context & { session: SessionData };
+
+const bot = new Bot<BotContext>(env.TELEGRAM_BOT_TOKEN);
+
+// Session middleware
+bot.use(
+    session({
+        initial: (): SessionData => ({
+            conversation_history: [],
+        }),
+    })
+);
+
+// ═══════════════════════════════════════════════════════════════
+//                    HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+async function broadcast(message: string, keyboard?: InlineKeyboard) {
+    const groups = groupManager.getGroups();
+    // Include ENV broadcast channel if set
+    if (env.BROADCAST_CHANNEL_ID) {
+        const adminChannel = Number(env.BROADCAST_CHANNEL_ID);
+        if (!isNaN(adminChannel) && !groups.includes(adminChannel)) {
+            groups.push(adminChannel);
+        }
+    }
+
+    if (groups.length === 0) return;
+
+    console.log(`📡 Broadcasting to ${groups.length} groups...`);
+
+    // Add deep link button to message if not present in keyboard? 
+    // Actually the message usually contains links.
+
+    await Promise.allSettled(groups.map(async (chatId) => {
+        try {
+            await bot.api.sendMessage(chatId, message, { parse_mode: "Markdown", reply_markup: keyboard });
+        } catch (error: any) {
+            // Remove group if bot was kicked
+            if (error.description?.includes("kicked") || error.description?.includes("blocked") || error.description?.includes("not a member")) {
+                console.log(`❌ Removing invalid group ${chatId}`);
+                groupManager.removeGroup(chatId);
+            } else {
+                console.error(`⚠️ Broadcast failed to ${chatId}:`, error.message);
+            }
+        }
+    }));
+}
+
+async function ensureUser(ctx: BotContext): Promise<User> {
+    const from = ctx.from!;
+    return db.getOrCreateUser(
+        from.id,
+        from.username || undefined,
+        from.first_name || undefined
+    );
+}
+
+function isAdmin(ctx: BotContext): boolean {
+    return env.ADMIN_IDS.includes(ctx.from?.id || 0);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//                     /start COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+// 🛡️ Middleware: Restrict trading to Private Chats
+// 🛡️ Middleware: Restrict trading to Private Chats + Deep Linking for Groups
+bot.use(async (ctx, next) => {
+    if (ctx.chat && ctx.chat.type !== "private" && ctx.message?.text?.startsWith("/")) {
+        const text = ctx.message.text!;
+        const cmd = text.split(" ")[0].split("@")[0];
+        const restricted = ["/newad", "/sell", "/buy", "/wallet", "/myads", "/mytrades", "/balance", "/deposit", "/withdraw"];
+
+        if (restricted.includes(cmd)) {
+            const username = ctx.me.username;
+            const chatId = ctx.chat.id;
+            // Redirect to DM with context
+            const startPayload = (cmd === "/newad" || cmd === "/sell") ? `${cmd.replace("/", "")}_${chatId}` : "dm";
+
+            await ctx.reply(`⚠️ Please [DM me](https://t.me/${username}?start=${startPayload}) to trade!`, { parse_mode: "Markdown" });
+            return;
+        }
+    }
+    await next();
+});
+
+
+// 🤖 Handle Groups: Automatically track where bot is added
+bot.on("my_chat_member", async (ctx) => {
+    const status = ctx.myChatMember.new_chat_member.status;
+    const oldStatus = ctx.myChatMember.old_chat_member.status;
+    const chat = ctx.chat;
+
+    if (status === "member" || status === "administrator") {
+        if (oldStatus === "left" || oldStatus === "kicked" || oldStatus === "restricted") {
+            groupManager.addGroup(chat.id);
+            await ctx.reply(
+                "🚀 *P2P Kerala Bot Activated!*\n\nI will post live buy/sell ads here.",
+                { parse_mode: "Markdown" }
+            );
+        }
+    } else if (status === "left" || status === "kicked") {
+        groupManager.removeGroup(chat.id);
+    }
+});
+
+// 📢 Broadcast command (Admin Only)
+bot.command("broadcast", async (ctx) => {
+    if (!env.ADMIN_IDS.includes(ctx.from?.id || 0)) {
+        return ctx.reply("❌ Unauthorized.");
+    }
+    const message = ctx.match?.toString().trim();
+    if (!message) return ctx.reply("Usage: /broadcast [Message]");
+
+    const userIds = await db.getAllTelegramIds();
+    let sent = 0;
+
+    await ctx.reply(`📢 Sending broadcast to ${userIds.length} users...`);
+
+    for (const userId of userIds) {
+        try {
+            await ctx.api.sendMessage(userId, `📢 *Announcement*\n\n${message}`, { parse_mode: "Markdown" });
+            sent++;
+            await new Promise(r => setTimeout(r, 50)); // Rate limit safety
+        } catch (e) { /* ignore blocked users */ }
+    }
+    await ctx.reply(`✅ Broadcast complete! Sent to ${sent}/${userIds.length} users.`);
+});
+
+bot.command("start", async (ctx) => {
+    // Handle Deep Linking
+    const payload = ctx.match?.toString().trim();
+
+    // 1. Group-specific Sell/NewAd
+    if (payload && (payload.startsWith("newad_") || payload.startsWith("sell_"))) {
+        const parts = payload.split("_");
+        const groupId = parts[1]; // Capture group ID
+
+        if (groupId) {
+            // Set session for targeted ad creation
+            ctx.session.ad_draft = {
+                target_group_id: Number(groupId),
+                type: "sell" // Default
+            };
+
+            await ctx.reply(
+                [
+                    "📢 *Create a New Ad*",
+                    "",
+                    "This ad will be posted to the group you came from!",
+                    "",
+                    "What do you want to do?",
+                ].join("\n"),
+                {
+                    parse_mode: "Markdown",
+                    reply_markup: new InlineKeyboard()
+                        .text("🔴 I want to SELL crypto", "newad:sell")
+                        .row()
+                        .text("🟢 I want to BUY crypto", "newad:buy")
+                }
+            );
+            return;
+        }
+    }
+
+    // 2. Buy specific order
+    if (payload && payload.startsWith("buy_")) {
+        const orderId = payload.replace("buy_", "");
+        const order = await db.getOrderById(orderId);
+        if (order && order.status === "active") {
+            const keyboard = new InlineKeyboard().text(`✅ View Ad & Buy`, `buy:${orderId}`);
+            await ctx.reply(`🔍 *Viewing Ad #${orderId.slice(0, 8)}*`, { parse_mode: "Markdown", reply_markup: keyboard });
+            return;
+        } else {
+            await ctx.reply("❌ Ad not found or no longer active.");
+            return;
+        }
+    }
+
+    const user = await ensureUser(ctx);
+
+    // Auto-create wallet if user doesn't have one
+    let walletInfo = "";
+    let isNewUser = false;
+    if (!user.wallet_address && env.MASTER_WALLET_SEED) {
+        try {
+            const derived = wallet.deriveWallet(user.wallet_index);
+            await db.updateUser(user.id, { wallet_address: derived.address });
+            isNewUser = true;
+            walletInfo = [
+                "",
+                "🎉 *Wallet Created Automatically!*",
+                `💳 Address: \`${derived.address}\``,
+                "",
+                "Your wallet is ready to receive USDC.",
+            ].join("\n");
+        } catch (err) {
+            console.error("Wallet creation failed:", err);
+        }
+    } else if (user.wallet_address) {
+        walletInfo = `\n💳 Wallet: \`${truncateAddress(user.wallet_address)}\``;
+    }
+
+    const upiStatus = user.upi_id
+        ? `📱 UPI: \`${user.upi_id}\``
+        : "📱 UPI: Not set — /upi to add";
+
+    const welcome = [
+        "🤖 *Welcome to P2P Kerala Bot!*",
+        "",
+        "Buy & sell crypto with INR — powered by AI 🧠",
+        walletInfo,
+        "",
+        "━━━━━━━━━━━━━━━━━━━",
+        "📢 *P2P Trading*",
+        "  /newad — Create buy/sell ad",
+        "  /ads — Browse live ads",
+        "  /myads — Manage your ads",
+        "",
+        "💰 *Wallet & Profile*",
+        "  /portfolio — Check balance & send",
+        "  /wallet — Wallet settings",
+        "  /upi — Set UPI ID",
+        "  /profile — Your stats",
+        "",
+        "💡 *Or chat naturally!*",
+        '  \"sell 100 usdc at 88\"',
+        '  \"show me buy orders\"',
+        "",
+        "━━━━━━━━━━━━━━━━━━━",
+        `🆔 Your ID: \`${user.id.slice(0, 8)}\``,
+        `⭐ Trust: ${user.trust_score}% | 📈 Trades: ${user.completed_trades}`,
+        upiStatus,
+    ].join("\n");
+
+    await ctx.reply(welcome, { parse_mode: "Markdown" });
+
+    // If new user, immediately ask for UPI
+    if (isNewUser && !user.upi_id) {
+        setTimeout(async () => {
+            const keyboard = new InlineKeyboard()
+                .text("📱 Set UPI Now", "setup_upi")
+                .row()
+                .text("⏭️ Skip for Now", "cancel_action");
+
+            await ctx.reply(
+                [
+                    "📱 *One more step — Set your UPI ID*",
+                    "",
+                    "You'll need UPI to receive/send fiat payments.",
+                    "",
+                    "Examples:",
+                    "• `yourname@upi`",
+                    "• `9876543210@paytm`",
+                    "• `yourname@okicici`",
+                    "",
+                    "Tap below or just type your UPI ID:",
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+            ctx.session.awaiting_input = "upi_id";
+        }, 1500); // Small delay so user reads welcome first
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /upi COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("upi", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    // If user provides UPI inline: /upi yourname@upi
+    const args = ctx.match?.trim();
+    if (args && args.includes("@")) {
+        await db.updateUser(user.id, { upi_id: args });
+        await ctx.reply(
+            [
+                "✅ *UPI ID Updated!*",
+                "",
+                `📱 UPI: \`${args}\``,
+                "",
+                "You're all set to trade! Try /newad",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        return;
+    }
+
+    if (user.upi_id) {
+        const keyboard = new InlineKeyboard()
+            .text("✏️ Change UPI", "setup_upi")
+            .text("✅ Keep Current", "cancel_action");
+
+        await ctx.reply(
+            [
+                "📱 *Your UPI ID*",
+                "",
+                `Current: \`${user.upi_id}\``,
+                "",
+                "Want to change it?",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+    } else {
+        ctx.session.awaiting_input = "upi_id";
+        await ctx.reply(
+            [
+                "📱 *Set Your UPI ID*",
+                "",
+                "Send your UPI ID to receive/send fiat payments.",
+                "",
+                "Examples:",
+                "• `yourname@upi`",
+                "• `9876543210@paytm`",
+                "• `yourname@okaxis`",
+                "• `yourname@okicici`",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /help COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("help", async (ctx) => {
+    const help = [
+        "📚 *P2P Kerala Bot — Help*",
+        "",
+        "*How P2P Trading Works:*",
+        "1️⃣ Seller lists crypto (e.g., 100 USDC at ₹88)",
+        "2️⃣ Buyer matches the order",
+        "3️⃣ Seller's crypto → locked in smart contract 🔒",
+        "4️⃣ Buyer sends fiat (UPI/Bank) → marks as paid",
+        "5️⃣ Seller confirms fiat received → crypto released ✅",
+        "6️⃣ Admin fee: 0.5% auto-deducted",
+        "",
+        "*Safety Features:*",
+        "🔒 Smart contract escrow (trustless)",
+        "⏰ Auto-release to buyer if seller ghosts (45 min)",
+        "⏰ Auto-refund to seller if buyer doesn't pay (1 hr)",
+        "📸 Payment proof required",
+        "⚖️ Dispute resolution system",
+        "⭐ Trust scoring",
+        "",
+        "*Commands:*",
+        "📢 /newad — Create a buy or sell ad",
+        "🔍 /ads — Browse live P2P ads",
+        "📋 /myads — Manage your ads",
+        "/sell — Quick sell order",
+        "/buy — Quick buy",
+        "/orders — View order book",
+        "/mytrades — Your trade history",
+        "/portfolio — View all token balances & send",
+        "/send — Withdraw crypto to external wallet",
+        "/wallet — Wallet settings",
+        "/export — Export private key",
+        "/bridge — Bridge tokens",
+        "/profile — Your profile",
+        "/dispute — Raise a dispute",
+        "",
+        `*Fee:* 0.5% per trade (${env.FEE_BPS} bps)`,
+        `*Network:* ${env.DEFAULT_CHAIN}`,
+        `*Token:* ${env.DEFAULT_TOKEN}`,
+        "",
+        "💬 Or just type what you want in plain English!",
+    ].join("\n");
+
+    await ctx.reply(help, { parse_mode: "Markdown" });
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /newad COMMAND (Create Ad)
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("newad", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    if (!user.upi_id) {
+        ctx.session.awaiting_input = "upi_id";
+        await ctx.reply(
+            [
+                "📱 *Set your UPI ID first!*",
+                "",
+                "You need UPI to receive/send fiat payments.",
+                "",
+                "Send your UPI ID (e.g., `yourname@upi`):",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        return;
+    }
+
+    if (!user.wallet_address) {
+        await ctx.reply("⚠️ Set up your wallet first! Type /start to create one.");
+        return;
+    }
+
+    const keyboard = new InlineKeyboard()
+        .text("🔴 I want to SELL crypto", "newad:sell")
+        .row()
+        .text("🟢 I want to BUY crypto", "newad:buy");
+
+    await ctx.reply(
+        [
+            "📢 *Create a New Ad*",
+            "",
+            "What do you want to do?",
+            "",
+            "🔴 *SELL* — You have crypto, want INR",
+            "🟢 *BUY* — You have INR, want crypto",
+        ].join("\n"),
+        { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+});
+
+bot.command("send", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    if (!user.wallet_address) {
+        await ctx.reply("⚠️ Set up your wallet first! Type /start to create one.");
+        return;
+    }
+
+    ctx.session.send_draft = {};
+
+    const keyboard = new InlineKeyboard()
+        .text("💵 USDC", "send_token:USDC")
+        .text("dt USDT", "send_token:USDT")
+        .text("💎 ETH", "send_token:ETH")
+        .row()
+        .text("❌ Cancel", "cancel_action");
+
+    await ctx.reply(
+        [
+            "💸 *Send Crypto*",
+            "",
+            "Withdraw your funds to any external wallet on Base.",
+            "",
+            "Select the token to send:",
+        ].join("\n"),
+        { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+});
+
+// Also keep /sell as alias
+bot.command("sell", async (ctx) => {
+    await ensureUser(ctx);
+
+    await ctx.reply(
+        [
+            "💰 *Create Sell Ad*",
+            "",
+            "Tell me what you want to sell:",
+            "",
+            '*Example:* "sell 100 usdc at 88 via upi"',
+            "",
+            "Or provide details step by step:",
+            "• Amount (e.g., 100 USDC)",
+            "• Rate in INR (e.g., ₹88/USDC)",
+            "• Payment method (UPI, IMPS, NEFT)",
+            "",
+            "Or use /newad for guided setup.",
+        ].join("\n"),
+        { parse_mode: "Markdown" }
+    );
+
+    ctx.session.awaiting_input = "sell_details";
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /ads COMMAND (Browse Live Ads)
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("ads", async (ctx) => {
+    await ensureUser(ctx);
+
+    const keyboard = new InlineKeyboard()
+        .text("🔴 Sell Ads (Buy crypto)", "ads:sell")
+        .text("🟢 Buy Ads (Sell crypto)", "ads:buy")
+        .row()
+        .text("📊 All Ads", "ads:all")
+        .row()
+        .text("🔍 Filter by Amount", "ads:filter_amount")
+        .text("🔍 Filter by Rate", "ads:filter_rate");
+
+    await ctx.reply(
+        [
+            "📢 *Live P2P Ads*",
+            "",
+            "Browse active trading ads from the community.",
+            "",
+            "🔴 *Sell Ads* — Traders selling crypto (you buy from them)",
+            "🟢 *Buy Ads* — Traders buying crypto (you sell to them)",
+            "",
+            "Select a category below:",
+        ].join("\n"),
+        { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /myads COMMAND (Manage Your Ads)
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("myads", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    try {
+        const orders = await db.getUserOrders(user.id);
+        const activeOrders = orders.filter((o: any) => o.status === "active");
+        const pausedOrders = orders.filter((o: any) => o.status === "paused");
+
+        if (orders.length === 0) {
+            const keyboard = new InlineKeyboard()
+                .text("📢 Create New Ad", "newad_start");
+
+            await ctx.reply(
+                [
+                    "📋 *My Ads*",
+                    "",
+                    "You don't have any ads yet!",
+                    "Create your first ad to start trading.",
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+            return;
+        }
+
+        const sections: string[] = ["📋 *My Ads*", ""];
+
+        if (activeOrders.length > 0) {
+            sections.push(`🟢 *Active Ads (${activeOrders.length})*`);
+            sections.push("");
+            activeOrders.forEach((o: any, i: number) => {
+                const emoji = o.type === "sell" ? "🔴" : "🟢";
+                const available = o.amount - (o.filled_amount || 0);
+                sections.push([
+                    `${i + 1}. ${emoji} *${o.type.toUpperCase()}* ${formatUSDC(available)}`,
+                    `   Rate: ${formatINR(o.rate)}/USDC | Total: ${formatINR(available * o.rate)}`,
+                    `   Payment: ${o.payment_methods?.join(", ") || "UPI"}`,
+                    `   ID: \`${o.id.slice(0, 8)}\``,
+                ].join("\n"));
+                sections.push("");
+            });
+        }
+
+        if (pausedOrders.length > 0) {
+            sections.push(`⏸️ *Paused Ads (${pausedOrders.length})*`);
+            pausedOrders.forEach((o: any, i: number) => {
+                sections.push(`  ${i + 1}. ${o.type.toUpperCase()} ${formatUSDC(o.amount)} at ${formatINR(o.rate)}`);
+            });
+            sections.push("");
+        }
+
+        const keyboard = new InlineKeyboard()
+            .text("📢 New Ad", "newad_start")
+            .text("⏸️ Pause All", "ads:pause_all")
+            .row()
+            .text("🗑️ Delete All", "ads:delete_all");
+
+        sections.push(
+            "━━━━━━━━━━━━━━━━━━━",
+            "Actions: Tap ad ID to edit, or use buttons below."
+        );
+
+        await ctx.reply(sections.join("\n"), { parse_mode: "Markdown", reply_markup: keyboard });
+    } catch (error) {
+        await ctx.reply("❌ Failed to load your ads.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /mytrades COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("mytrades", async (ctx) => {
+    const user = await ensureUser(ctx);
+    try {
+        const trades = await db.getUserTrades(user.id);
+
+        if (trades.length === 0) {
+            await ctx.reply("📭 You have no active trades.");
+            return;
+        }
+
+        const keyboard = new InlineKeyboard();
+
+        const statusMap: any = {
+            'created': '🆕 Created',
+            'in_escrow': '🟡 In Escrow',
+            'fiat_sent': '🔵 Paid',
+            'completed': '✅ Completed',
+            'disputed': '🔴 Disputed',
+            'cancelled': '❌ Cancelled'
+        };
+
+        trades.forEach((t: any) => {
+            const isBuyer = t.buyer_id === user.id;
+            const role = isBuyer ? "🟢 Buying" : "🔴 Selling";
+            const amt = formatUSDC(t.amount, t.token);
+            const status = statusMap[t.status] || t.status;
+
+            keyboard.text(`${role} ${amt} (${status})`, `trade_view:${t.id}`).row();
+        });
+
+        await ctx.reply("📋 *Your Trades*\nSelect a trade to view actions:", {
+            parse_mode: "Markdown",
+            reply_markup: keyboard
+        });
+    } catch (e) {
+        console.error("MyTrades error:", e);
+        await ctx.reply("❌ Failed to fetch trades.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /buy COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("buy", async (ctx) => {
+    await ensureUser(ctx);
+
+    // Show available sell orders
+    try {
+        const orders = await db.getActiveOrders("sell", "USDC", 10);
+
+        if (orders.length === 0) {
+            await ctx.reply(
+                [
+                    "📊 *No sell orders available right now*",
+                    "",
+                    "Be the first! Create a sell order with /sell",
+                    "Or check back later.",
+                ].join("\n"),
+                { parse_mode: "Markdown" }
+            );
+            return;
+        }
+
+        const orderList = orders.map((o, i) => formatOrder(o, i)).join("\n\n");
+
+        const keyboard = new InlineKeyboard();
+        orders.slice(0, 5).forEach((o) => {
+            keyboard.text(`Buy ${formatUSDC(o.amount - o.filled_amount)}`, `buy:${o.id}`).row();
+        });
+
+        await ctx.reply(
+            [
+                "📊 *Available Sell Orders*",
+                "",
+                orderList,
+                "",
+                "━━━━━━━━━━━━━━━━━━━",
+                "Tap a button below or type the order ID to buy.",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+    } catch (error) {
+        await ctx.reply("❌ Failed to load orders. Database may not be configured yet.\n\nRun /help for setup instructions.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /orders COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("orders", async (ctx) => {
+    try {
+        const [sellOrders, buyOrders] = await Promise.all([
+            db.getActiveOrders("sell", undefined, 5),
+            db.getActiveOrders("buy", undefined, 5),
+        ]);
+
+        const sections: string[] = ["📊 *Order Book*", ""];
+        const keyboard = new InlineKeyboard();
+
+        if (sellOrders.length > 0) {
+            sections.push("🔴 *SELL ORDERS* (Buy these)");
+            sections.push("");
+            sellOrders.forEach((o, i) => {
+                sections.push(formatOrder(o, i));
+                const available = o.amount - (o.filled_amount || 0);
+                keyboard.text(`🟢 Buy ${formatUSDC(available, o.token)} @ ${formatINR(o.rate)}`, `trade_ad:${o.id}`).row();
+            });
+        } else {
+            sections.push("🔴 *SELL ORDERS* — None available");
+        }
+
+        sections.push("");
+
+        if (buyOrders.length > 0) {
+            sections.push("🟢 *BUY ORDERS* (Sell to these)");
+            sections.push("");
+            buyOrders.forEach((o, i) => {
+                sections.push(formatOrder(o, i));
+                const available = o.amount - (o.filled_amount || 0);
+                keyboard.text(`🔴 Sell ${formatUSDC(available, o.token)} @ ${formatINR(o.rate)}`, `trade_ad:${o.id}`).row();
+            });
+        } else {
+            sections.push("🟢 *BUY ORDERS* — None available");
+        }
+
+        sections.push(
+            "",
+            "━━━━━━━━━━━━━━━━━━━",
+            "Select an order above to start a trade.",
+            "Or use /newad to list your own."
+        );
+
+        await ctx.reply(sections.join("\n"), { parse_mode: "Markdown", reply_markup: keyboard });
+    } catch (error) {
+        await ctx.reply("❌ Failed to load orders. Database may not be configured yet.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /balance COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command(["balance", "portfolio"], async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    if (!user.wallet_address) {
+        await ctx.reply(
+            [
+                "💰 *Wallet Balance*",
+                "",
+                "⚠️ No wallet connected yet!",
+                "",
+                "Use /wallet to set up your wallet address.",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        return;
+    }
+
+    try {
+        const balances = await wallet.getBalances(user.wallet_address);
+        const keyboard = new InlineKeyboard()
+            .text("💸 Send USDC", "send_token:USDC")
+            .text("💸 Send USDT", "send_token:USDT")
+            .row()
+            .text("💸 Send ETH", "send_token:ETH")
+            .row()
+            .text("✨ Create Ad", "newad_start");
+
+        await ctx.reply(
+            [
+                "💰 *Your Portfolio*",
+                "",
+                `Address: \`${truncateAddress(user.wallet_address)}\``,
+                "",
+                `💵 *USDC*: ${balances.usdc}`,
+                `💵 *USDT*: ${balances.usdt}`,
+                `💎 *ETH*: ${balances.eth}`,
+                "",
+                "━━━━━━━━━━━━━━━━━━━",
+                "Select a token to withdraw or create a trade:",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+    } catch (error) {
+        await ctx.reply(
+            [
+                "💰 *Your Wallet*",
+                "",
+                `Address: \`${truncateAddress(user.wallet_address)}\``,
+                "⚠️ Could not fetch balance. RPC may be unavailable.",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /wallet COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("wallet", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    if (user.wallet_address) {
+        const keyboard = new InlineKeyboard()
+            .text("📋 Copy Address", `copy:${user.wallet_address}`)
+            .row()
+            .text("🔑 Export Private Key", "export_key")
+            .row()
+            .text("📱 Set UPI", "change_upi");
+
+        await ctx.reply(
+            [
+                "🔑 *Your Wallet*",
+                "",
+                `💳 Address: \`${user.wallet_address}\``,
+                `📱 UPI: ${user.upi_id || "Not set"}`,
+                "",
+                "Your wallet was created automatically.",
+                "You OWN this wallet — export your key anytime!",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+    } else {
+        await ctx.reply(
+            [
+                "🔑 *Wallet Setup*",
+                "",
+                "Send me your Base wallet address:",
+                "",
+                "Example: `0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18`",
+                "",
+                "This is where you'll receive USDC from trades.",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        ctx.session.awaiting_input = "wallet_address";
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /export COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("export", async (ctx) => {
+    // Only allow in private chats (NEVER expose keys in groups)
+    if (ctx.chat.type !== "private") {
+        await ctx.reply("⚠️ For security, key export is only available in DM. Message me directly!");
+        return;
+    }
+
+    const user = await ensureUser(ctx);
+
+    if (!user.wallet_address || !env.MASTER_WALLET_SEED) {
+        await ctx.reply("❌ No wallet found. Type /start to create one.");
+        return;
+    }
+
+    const keyboard = new InlineKeyboard()
+        .text("⚠️ Yes, show my private key", "confirm_export")
+        .row()
+        .text("❌ Cancel", "cancel_action");
+
+    await ctx.reply(
+        [
+            "🔒 *Export Private Key*",
+            "",
+            "⚠️ *WARNING:*",
+            "• Anyone with your private key can STEAL your funds",
+            "• NEVER share it with anyone",
+            "• NEVER paste it on any website",
+            "• Screenshot it and keep it OFFLINE",
+            "",
+            "Are you sure you want to see your private key?",
+        ].join("\n"),
+        { parse_mode: "Markdown", reply_markup: keyboard }
+    );
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /profile COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("profile", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    const stars = user.trust_score >= 95 ? "💎" :
+        user.trust_score >= 80 ? "⭐" :
+            user.trust_score >= 60 ? "🟢" :
+                user.trust_score >= 30 ? "🟡" : "🔴";
+
+    await ctx.reply(
+        [
+            "👤 *Your Profile*",
+            "",
+            `Name: ${user.first_name || "Anonymous"}`,
+            `Username: @${user.username || "not set"}`,
+            `Tier: ${user.tier.toUpperCase()}`,
+            "",
+            "━━━━━━━━━━━━━━━━",
+            `${stars} Trust: ${user.trust_score}%`,
+            `📈 Total Trades: ${user.trade_count}`,
+            `✅ Completed: ${user.completed_trades}`,
+            `📊 Success Rate: ${user.trade_count > 0 ? ((user.completed_trades / user.trade_count) * 100).toFixed(0) : 0}%`,
+            "",
+            `💳 Wallet: ${user.wallet_address ? `\`${truncateAddress(user.wallet_address)}\`` : "Not set"}`,
+            `📱 UPI: ${user.upi_id || "Not set"}`,
+            `🔐 Verified: ${user.is_verified ? "Yes ✅" : "No"}`,
+            "",
+            `Member since: ${new Date(user.created_at).toLocaleDateString()}`,
+        ].join("\n"),
+        { parse_mode: "Markdown" }
+    );
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /bridge COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("bridge", async (ctx) => {
+    await ensureUser(ctx);
+
+    await ctx.reply(
+        [
+            "🌉 *Bridge Tokens*",
+            "",
+            "Move tokens across chains! Powered by LI.FI aggregator.",
+            "",
+            "Supported chains: Base, Ethereum, Arbitrum, Polygon, Optimism",
+            "",
+            "Tell me what to bridge:",
+            '  "bridge 50 usdc from base to ethereum"',
+            '  "bridge 0.1 eth to arbitrum"',
+            "",
+            "I'll find the best route with lowest fees! 🔍",
+        ].join("\n"),
+        { parse_mode: "Markdown" }
+    );
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /admin COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("admin", async (ctx) => {
+    if (!isAdmin(ctx)) {
+        await ctx.reply("⛔ Admin access only.");
+        return;
+    }
+
+    try {
+        const stats = await db.getStats();
+
+        await ctx.reply(
+            [
+                "🛡️ *Admin Dashboard*",
+                "",
+                "━━━━ *Platform Stats* ━━━━",
+                `👥 Total Users: ${stats.total_users}`,
+                `📊 Total Trades: ${stats.total_trades}`,
+                `✅ Completed: ${stats.completed_trades}`,
+                `📋 Active Orders: ${stats.active_orders}`,
+                `💰 Volume: ${formatUSDC(stats.total_volume_usdc)}`,
+                `💸 Fees Collected: ${formatUSDC(stats.total_fees_collected)}`,
+                `⚠️ Active Disputes: ${stats.active_disputes}`,
+                "",
+                "━━━━ *Actions* ━━━━",
+                "/disputes — View open disputes",
+                "/stats — Refresh stats",
+                "/broadcast — Send message to all",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+    } catch (error) {
+        await ctx.reply("❌ Failed to load stats. Database may not be configured.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                     /disputes COMMAND
+// ═══════════════════════════════════════════════════════════════
+
+bot.command("disputes", async (ctx) => {
+    if (!isAdmin(ctx)) {
+        await ctx.reply("⛔ Admin access only.");
+        return;
+    }
+
+    try {
+        const disputes = await db.getDisputedTrades();
+
+        if (disputes.length === 0) {
+            await ctx.reply("✅ No active disputes! 🎉");
+            return;
+        }
+
+        for (const trade of disputes) {
+            const keyboard = new InlineKeyboard()
+                .text("✅ Release to Buyer", `resolve:${trade.id}:buyer`)
+                .row()
+                .text("🔄 Refund to Seller", `resolve:${trade.id}:seller`);
+
+            await ctx.reply(
+                [
+                    `⚠️ *Dispute — Trade ${trade.id.slice(0, 8)}*`,
+                    "",
+                    `Amount: ${formatUSDC(trade.amount)}`,
+                    `Fiat: ${formatINR(trade.fiat_amount)}`,
+                    `Status: ${formatTradeStatus(trade.status)}`,
+                    `Reason: ${trade.dispute_reason || "Not specified"}`,
+                    "",
+                    `Created: ${new Date(trade.created_at).toLocaleString()}`,
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+        }
+    } catch (error) {
+        await ctx.reply("❌ Failed to load disputes.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//              CALLBACK QUERY HANDLERS
+// ═══════════════════════════════════════════════════════════════
+
+bot.on("callback_query:data", async (ctx) => {
+    const data = ctx.callbackQuery.data;
+
+    // ─────── AD CREATION HANDLERS ───────
+
+    // Handle "I want to SELL/BUY" from /newad
+    // Handle "I want to SELL/BUY" from /newad
+    if (data === "newad:sell" || data === "newad:buy") {
+        const adType = data.replace("newad:", "");
+        ctx.session.ad_draft = { type: adType };
+
+        const keyboard = new InlineKeyboard()
+            .text("💵 USDC (Base)", `newad_token:USDC`)
+            .text("dt USDT (Base)", `newad_token:USDT`);
+
+        await ctx.editMessageText(
+            [
+                `📢 *Create ${adType.toUpperCase()} Ad — Step 1/3*`,
+                "",
+                "Which token do you want to trade?",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle Token Selection -> Ask Amount
+    if (data.startsWith("newad_token:")) {
+        const token = data.replace("newad_token:", "");
+        const draft = ctx.session.ad_draft;
+
+        if (!draft || !draft.type) {
+            await ctx.answerCallbackQuery({ text: "Session expired. Start over." });
+            return;
+        }
+
+        draft.token = token;
+        ctx.session.awaiting_input = `ad_amount_${draft.type}`;
+
+        const minAmount = 1;
+
+        await ctx.editMessageText(
+            [
+                `📢 *Create ${draft.type.toUpperCase()} Ad — Step 2/3*`,
+                "",
+                `Selected: *${token}* ✅`,
+                "",
+                `How much ${token} do you want to ${draft.type}?`,
+                "",
+                `Minimum: *${minAmount} ${token}*`,
+                "",
+                "Send the amount (e.g., `100` or `50.5`):",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle Send Token Selection -> Ask Address
+    if (data.startsWith("send_token:")) {
+        const token = data.replace("send_token:", "");
+        const tokenAddress = token === "ETH" ? "native" : (token === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS);
+
+        ctx.session.send_draft = { token, token_address: tokenAddress };
+        ctx.session.awaiting_input = "send_to_address";
+
+        await ctx.editMessageText(
+            [
+                "💸 *Send Crypto — Step 1/3*",
+                "",
+                `Token: *${token}*`,
+                "",
+                "Please send the *destination wallet address* (Base network):",
+                "",
+                "_Example: 0x123..._",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle "Create New Ad" button
+    if (data === "newad_start") {
+        const keyboard = new InlineKeyboard()
+            .text("🔴 I want to SELL crypto", "newad:sell")
+            .row()
+            .text("🟢 I want to BUY crypto", "newad:buy");
+
+        await ctx.editMessageText(
+            [
+                "📢 *Create a New Ad*",
+                "",
+                "What do you want to do?",
+                "",
+                "🔴 *SELL* — You have crypto, want INR",
+                "🟢 *BUY* — You have INR, want crypto",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // ─────── AD BROWSING HANDLERS ───────
+
+    // Browse sell/buy/all ads
+    if (data === "ads:sell" || data === "ads:buy" || data === "ads:all") {
+        const filterType = data === "ads:all" ? undefined : data.replace("ads:", "");
+        const label = data === "ads:sell" ? "Sell" : data === "ads:buy" ? "Buy" : "All";
+
+        try {
+            // Fetch all tokens by default in category view
+            const orders = await db.getActiveOrders(filterType, undefined, 10);
+
+            if (orders.length === 0) {
+                await ctx.editMessageText(
+                    [
+                        `📢 *${label} Ads*`,
+                        "",
+                        "No ads available right now! 😔",
+                        "",
+                        "Be the first — /newad to create one!",
+                    ].join("\n"),
+                    { parse_mode: "Markdown" }
+                );
+                await ctx.answerCallbackQuery();
+                return;
+            }
+
+            const adList = orders.map((o, i) => {
+                const emoji = o.type === "sell" ? "🔴 SELL" : "🟢 BUY";
+                const available = o.amount - (o.filled_amount || 0);
+                const stars = (o.trust_score ?? 0) >= 90 ? "💎" :
+                    (o.trust_score ?? 0) >= 70 ? "⭐" : "🟢";
+
+                return [
+                    `${i + 1}. ${emoji} *${formatUSDC(available, o.token)}*`,
+                    `   💰 Rate: ${formatINR(o.rate)}/${o.token}`,
+                    `   💵 Total: ${formatINR(available * o.rate)}`,
+                    `   💳 ${o.payment_methods?.join(", ") || "UPI"}`,
+                    `   👤 @${o.username || "anon"} ${stars}`,
+                    `   🆔 \`${o.id.slice(0, 8)}\``,
+                ].join("\n");
+            }).join("\n\n");
+
+            // Create inline buttons for top 5 ads
+            const keyboard = new InlineKeyboard();
+            orders.slice(0, 5).forEach((o) => {
+                const available = o.amount - (o.filled_amount || 0);
+                const action = o.type === "sell" ? "Buy" : "Sell";
+                keyboard.text(
+                    `${action} ${formatUSDC(available, o.token)} @ ${formatINR(o.rate)}`,
+                    `trade_ad:${o.id}`
+                ).row();
+            });
+            keyboard.text("🔄 Refresh", data).text("⬅️ Back", "ads_back");
+
+            await ctx.editMessageText(
+                [
+                    `📢 *Live ${label} Ads*`,
+                    `   _${orders.length} ads available_`,
+                    "",
+                    adList,
+                    "",
+                    "━━━━━━━━━━━━━━━━━━━",
+                    "Tap an ad below to start a trade:",
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+        } catch (error) {
+            await ctx.editMessageText("❌ Failed to load ads. Database may not be configured.");
+        }
+        await ctx.answerCallbackQuery();
+    }
+
+    // Back to ad categories
+    if (data === "ads_back") {
+        const keyboard = new InlineKeyboard()
+            .text("🔴 Sell Ads", "ads:sell")
+            .text("🟢 Buy Ads", "ads:buy")
+            .row()
+            .text("📊 All Ads", "ads:all");
+
+        await ctx.editMessageText(
+            [
+                "📢 *Live P2P Ads*",
+                "",
+                "Select a category:",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle clicking on a specific ad to initiate trade
+    if (data.startsWith("trade_ad:")) {
+        const orderId = data.replace("trade_ad:", "");
+        const user = await ensureUser(ctx);
+        const order = await db.getOrderById(orderId);
+
+        if (!order || order.status !== "active") {
+            await ctx.answerCallbackQuery({ text: "This ad is no longer available!" });
+            return;
+        }
+
+        if (order.user_id === user.id) {
+            await ctx.answerCallbackQuery({ text: "This is your own ad!" });
+            return;
+        }
+
+        const available = order.amount - (order.filled_amount || 0);
+        const feeAmount = available * env.FEE_PERCENTAGE;
+        const buyerReceives = available - feeAmount;
+        const action = order.type === "sell" ? "BUY from" : "SELL to";
+
+        const keyboard = new InlineKeyboard()
+            .text("✅ Start Trade", `confirm_trade:${orderId}`)
+            .text("❌ Cancel", "cancel_action");
+
+        await ctx.editMessageText(
+            [
+                `🤝 *${action} this trader?*`,
+                "",
+                `Amount: *${formatUSDC(available, order.token)}*`,
+                `Rate: *${formatINR(order.rate)}/${order.token}*`,
+                `Total Fiat: *${formatINR(available * order.rate)}*`,
+                "",
+                `Fee (0.5%): ${formatUSDC(feeAmount, order.token)}`,
+                `Buyer receives: ${formatUSDC(buyerReceives, order.token)}`,
+                "",
+                `Payment: ${order.payment_methods?.join(", ") || "UPI"}`,
+                `Trader: @${order.username || "anon"}`,
+                "",
+                order.type === "sell"
+                    ? "⚠️ Seller deposits USDC to escrow → You send fiat → Crypto released to you"
+                    : "⚠️ You deposit USDC to escrow → Buyer sends fiat → You confirm → Crypto released",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // ─────── AD PAYMENT METHOD SELECTION (Final Step) ───────
+
+    if (data.startsWith("ad_pay:")) {
+        const method = data.replace("ad_pay:", "");
+        const user = await ensureUser(ctx);
+        const draft = ctx.session.ad_draft;
+
+        if (!draft || !draft.amount || !draft.rate || !draft.type) {
+            await ctx.answerCallbackQuery({ text: "Session expired. Start over with /newad" });
+            return;
+        }
+
+        const paymentMethods = method === "all"
+            ? ["UPI", "IMPS", "NEFT"]
+            : [method.toUpperCase()];
+
+        try {
+            // ═══ FOR SELL ADS: Check balance & lock USDC in escrow ═══
+            if (draft.type === "sell") {
+                const tokenSymbol = draft.token || "USDC";
+                const tokenAddress = (tokenSymbol === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+
+                const feeAmount = draft.amount * env.FEE_PERCENTAGE;
+                const totalRequired = draft.amount + feeAmount;
+
+                await ctx.editMessageText(`⏳ Checking your ${tokenSymbol} balance (Amount + Fee)...`);
+
+                // Step 1: Check seller's balance
+                const balance = await wallet.getTokenBalance(user.wallet_address!, tokenAddress);
+                const balanceNum = parseFloat(balance);
+
+                if (balanceNum < totalRequired) {
+                    await ctx.reply(
+                        [
+                            `❌ *Insufficient ${tokenSymbol} Balance*`,
+                            "",
+                            `Your balance: *${formatUSDC(balanceNum, tokenSymbol)}*`,
+                            `Required: *${formatUSDC(totalRequired, tokenSymbol)}* (incl. fee)`,
+                            `Short by: *${formatUSDC(totalRequired - balanceNum, tokenSymbol)}*`,
+                            "",
+                            `📥 Deposit ${tokenSymbol} to your wallet:`,
+                            `\`${user.wallet_address}\``,
+                            "",
+                            "Then try /newad again.",
+                        ].join("\n"),
+                        { parse_mode: "Markdown" }
+                    );
+                    ctx.session.ad_draft = undefined;
+                    ctx.session.awaiting_input = undefined;
+                    await ctx.answerCallbackQuery();
+                    return;
+                }
+
+                // Step 1.5: Check ETH balance for gas
+                const ethBalance = await wallet.getEthBalance(user.wallet_address!);
+                if (parseFloat(ethBalance) < 0.000005) { // Min 0.000005 ETH for gas (Base is cheap!)
+                    await ctx.reply(
+                        [
+                            "❌ *Insufficient ETH for Gas*",
+                            "",
+                            "You need a small amount of ETH to pay for the blockchain transaction to lock your crypto.",
+                            "",
+                            `Current balance: \`${ethBalance} ETH\``,
+                            "Required: ~`0.00001 ETH`",
+                            "",
+                            `📥 Deposit ETH to: \`${user.wallet_address}\``,
+                        ].join("\n"),
+                        { parse_mode: "Markdown" }
+                    );
+                    return;
+                }
+
+                // Step 2: Lock Token — transfer to bot's escrow wallet
+                await ctx.editMessageText("🔒 Locking your crypto in escrow...");
+
+                const relayerAddress = await wallet.getRelayerAddress();
+
+                // Transfer TOTAL (Amount + Fee) to Relayer
+                const escrowTxHash = await wallet.sendToken(
+                    user.wallet_index,
+                    relayerAddress,
+                    totalRequired,
+                    tokenAddress
+                );
+
+                // Step 3: Create the order in database (with escrow proof)
+                const amount = draft.amount!;
+                const token = draft.token! || "USDC";
+
+                const order = await db.createOrder({
+                    user_id: user.id,
+                    type: "sell",
+                    token: token,
+                    chain: "base",
+                    amount: amount,
+
+                    rate: draft.rate,
+                    fiat_currency: "INR",
+                    payment_methods: paymentMethods as any,
+                    payment_details: {
+                        upi: user.upi_id || "",
+                        escrow_tx: escrowTxHash,
+                        group_id: draft.target_group_id // Save target group ID
+                    },
+                    status: "active",
+                    filled_amount: 0,
+                });
+
+                const totalFiat = amount * draft.rate;
+                const explorerUrl = escrow.getExplorerUrl(escrowTxHash);
+
+                // Clear draft
+                ctx.session.ad_draft = undefined;
+                ctx.session.awaiting_input = undefined;
+
+                // Broadcast Logic (Group Specific)
+                const botUser = await ctx.api.getMe();
+                // Explicitly cast to prevent lint errors
+                const groupVal = (order.payment_details as any)?.group_id;
+                const targetGroup = typeof groupVal === 'number' ? groupVal : undefined;
+
+                if (targetGroup !== undefined) {
+                    // Post ONLY to that group
+                    await ctx.api.sendMessage(
+                        String(targetGroup),
+                        `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👉 [Buy Now](https://t.me/${botUser.username}?start=buy_${order.id})`,
+                        { parse_mode: "Markdown" }
+                    ).catch(e => console.error(`Group Broadcast failed to ${targetGroup}:`, e));
+
+                } else if (env.BROADCAST_CHANNEL_ID) {
+                    // Fallback: Post to Main Channel for Direct DM ads
+                    await ctx.api.sendMessage(
+                        env.BROADCAST_CHANNEL_ID,
+                        `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👉 [Buy Now](https://t.me/${botUser.username}?start=buy_${order.id})`,
+                        { parse_mode: "Markdown" }
+                    ).catch(e => console.error("Main Channel Broadcast failed:", e));
+                }
+
+                const keyboard = new InlineKeyboard()
+                    .text("📢 View My Ads", "myads_view")
+                    .text("📢 Create Another", "newad_start")
+                    .row()
+                    .text("🗑️ Cancel & Unlock", `ad_cancel_unlock:${order.id}`);
+
+                await ctx.reply(
+                    [
+                        "✅ *Sell Ad Created — Funds Locked!*",
+                        "",
+                        "🔴 *SELL Ad*",
+                        "",
+                        `💰 Amount: *${formatUSDC(draft.amount)}*`,
+                        `📈 Rate: *${formatINR(draft.rate)}/USDC*`,
+                        `💵 Total: *${formatINR(totalFiat)}*`,
+                        `💳 Payment: ${paymentMethods.join(", ")}`,
+                        `🏷️ Fee: ${formatUSDC(feeAmount)} (0.5%)`,
+                        "",
+                        `🔒 *USDC Locked in Escrow* ✅`,
+                        `🔗 [View on BaseScan](${explorerUrl})`,
+                        "",
+                        `🆔 Ad ID: \`${order.id.slice(0, 8)}\``,
+                        "",
+                        "━━━━━━━━━━━━━━━━━━━",
+                        "Your ad is now LIVE! Buyers can see it.",
+                        "Cancel anytime to unlock your USDC.",
+                    ].join("\n"),
+                    { parse_mode: "Markdown", reply_markup: keyboard }
+                );
+
+            } else {
+                // ═══ FOR BUY ADS: No escrow needed (buyer wants to buy crypto) ═══
+                const amount = draft.amount!;
+                const token = draft.token! || "USDC";
+
+                const order = await db.createOrder({
+                    user_id: user.id,
+                    type: "buy",
+                    token: token,
+                    chain: "base",
+                    amount: amount,
+                    rate: draft.rate,
+                    fiat_currency: "INR",
+                    payment_methods: paymentMethods as any,
+                    payment_details: { upi: user.upi_id || "" },
+                    status: "active",
+                    filled_amount: 0,
+                });
+
+                const totalFiat = amount * draft.rate;
+
+                ctx.session.ad_draft = undefined;
+                ctx.session.awaiting_input = undefined;
+
+                const keyboard = new InlineKeyboard()
+                    .text("📢 View My Ads", "myads_view")
+                    .text("📢 Create Another", "newad_start")
+                    .row()
+                    .text("🗑️ Delete Ad", `ad_delete:${order.id}`);
+
+                await ctx.reply(
+                    [
+                        `✅ *Buy Ad Created!*`,
+                        "",
+                        `🟢 *BUY Ad*`,
+                        "",
+                        `💰 Want to buy: *${formatUSDC(amount, token)}*`,
+                        `📈 Rate: *${formatINR(draft.rate)}/${token}*`,
+                        `💵 Will pay: *${formatINR(totalFiat)}*`,
+                        `💳 Payment: ${paymentMethods.join(", ")}`,
+                        "",
+                        `🆔 Ad ID: \`${order.id.slice(0, 8)}\``,
+                        "",
+                        "━━━━━━━━━━━━━━━━━━━",
+                        "Your ad is LIVE! Sellers can respond.",
+                        `When a seller matches, they'll lock ${token} in escrow first.`,
+                    ].join("\n"),
+                    { parse_mode: "Markdown", reply_markup: keyboard }
+                );
+            }
+        } catch (error: any) {
+            console.error("Ad creation error:", error);
+            const errMsg = error?.message?.includes("insufficient")
+                ? "❌ Insufficient USDC balance. Deposit more and try again."
+                : "❌ Failed to create ad. Please try again with /newad";
+            await ctx.reply(errMsg);
+        }
+        await ctx.answerCallbackQuery();
+    }
+
+    // Confirm Send Transaction
+    if (data === "confirm_send") {
+        const draft = ctx.session.send_draft;
+        const user = await ensureUser(ctx);
+
+        if (!draft || !draft.to_address || !draft.amount || !draft.token) {
+            await ctx.answerCallbackQuery({ text: "Session expired. Start over." });
+            return;
+        }
+
+        await ctx.editMessageText("⏳ Sending tokens on blockchain...");
+
+        try {
+            const txHash = draft.token === "ETH"
+                ? await wallet.sendEth(user.wallet_index, draft.to_address, draft.amount)
+                : await wallet.sendToken(
+                    user.wallet_index,
+                    draft.to_address,
+                    draft.amount,
+                    draft.token_address
+                );
+
+            ctx.session.send_draft = undefined;
+
+            await ctx.editMessageText(
+                [
+                    "✅ *Tokens Sent!* 🚀",
+                    "",
+                    `Amount: *${draft.amount} ${draft.token}*`,
+                    `To: \`${draft.to_address}\``,
+                    "",
+                    `🔗 [View on BaseScan](${escrow.getExplorerUrl(txHash)})`,
+                ].join("\n"),
+                { parse_mode: "Markdown" }
+            );
+        } catch (error) {
+            console.error("Send error:", error);
+            await ctx.editMessageText("❌ Translation failed on blockchain. Please try again.");
+        }
+        await ctx.answerCallbackQuery();
+    }
+
+
+    // Unified Cancel/Delete Handler (Handles refunds for Sell ads)
+    if (data.startsWith("ad_cancel_unlock:") || data.startsWith("ad_delete:")) {
+        const orderId = data.replace(/ad_cancel_unlock:|ad_delete:/, "");
+        const user = await ensureUser(ctx);
+        const order = await db.getOrderById(orderId);
+
+        if (!order || order.status === "cancelled") {
+            await ctx.answerCallbackQuery({ text: "Order not active!" });
+            return;
+        }
+
+        if (order.user_id !== user.id) {
+            await ctx.answerCallbackQuery({ text: "Not your ad!" });
+            return;
+        }
+
+        // Handle Refunds for Sell Ads
+        if ((order.status === "active" || order.status === "paused") && order.type === "sell") {
+            await ctx.editMessageText("⏳ Unlocking funds & refunding...");
+            try {
+                await db.cancelOrder(orderId); // Mark cancelled FIRST
+                const refundTx = await wallet.adminRefund(user.wallet_address!, order.amount);
+
+                await ctx.editMessageText(
+                    [
+                        "✅ *Ad Cancelled & Funds Unlocked*",
+                        "",
+                        `Refunded: *${formatUSDC(order.amount)}*`,
+                        `To: \`${truncateAddress(user.wallet_address!)}\``,
+                        "",
+                        `🔗 [View Refund Tx](${escrow.getExplorerUrl(refundTx)})`,
+                    ].join("\n"),
+                    { parse_mode: "Markdown" }
+                );
+            } catch (error) {
+                console.error("Refund failed:", error);
+                await ctx.editMessageText("❌ Refund failed! Please contact support.");
+            }
+        } else {
+            // Just cancel (Buy ads or already refunded)
+            await db.cancelOrder(orderId);
+            await ctx.editMessageText("🗑️ Ad deleted.");
+        }
+        await ctx.answerCallbackQuery();
+    }
+
+    // Pause Ad
+    if (data.startsWith("ad_pause:")) {
+        const orderId = data.replace("ad_pause:", "");
+        await db.updateOrder(orderId, { status: "paused" });
+        await ctx.answerCallbackQuery({ text: "Ad paused" });
+        const keyboard = new InlineKeyboard()
+            .text("▶️ Resume Ad", `ad_resume:${orderId}`)
+            .text("🗑️ Delete Ad", `ad_delete:${orderId}`);
+        await ctx.editMessageReplyMarkup({ reply_markup: keyboard });
+    }
+
+    // Resume Ad
+    if (data.startsWith("ad_resume:")) {
+        const orderId = data.replace("ad_resume:", "");
+        await db.updateOrder(orderId, { status: "active" });
+        await ctx.answerCallbackQuery({ text: "Ad resumed" });
+        const keyboard = new InlineKeyboard()
+            .text("⏸️ Pause Ad", `ad_pause:${orderId}`)
+            .text("🗑️ Delete Ad", `ad_delete:${orderId}`);
+        await ctx.editMessageReplyMarkup({ reply_markup: keyboard });
+    }
+
+    // Confirm Trade (Start Trade)
+    if (data.startsWith("confirm_trade:")) {
+        const orderId = data.replace("confirm_trade:", "");
+        const user = await ensureUser(ctx);
+        const order = await db.getOrderById(orderId);
+
+        if (!order || order.status !== "active") {
+            await ctx.answerCallbackQuery({ text: "Order not available!" });
+            return;
+        }
+
+        // Prevent trading with self
+        if (order.user_id === user.id) {
+            await ctx.answerCallbackQuery({ text: "You can't trade with yourself!" });
+            return;
+        }
+
+        try {
+            if (order.type === "sell") {
+                await ctx.editMessageText("⏳ Initiating trade on blockchain...");
+
+                const tokenSymbol = order.token || "USDC";
+                const tokenAddress = tokenSymbol === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+
+                // 1. Relayer creates trade on Smart Contract (moves funds to contract)
+                const { txHash, tradeId } = await wallet.relayerCreateTrade(
+                    user.wallet_address!, // Buyer address
+                    order.amount,
+                    tokenAddress
+                );
+
+                // 2. Create local Trade record
+                const trade = await db.createTrade({
+                    order_id: order.id,
+                    buyer_id: user.id,
+                    seller_id: order.user_id,
+                    token: tokenSymbol,
+                    chain: "base",
+                    amount: order.amount,
+                    rate: order.rate,
+                    fiat_amount: order.amount * order.rate,
+                    fiat_currency: "INR",
+                    fee_amount: order.amount * env.FEE_PERCENTAGE,
+                    fee_percentage: env.FEE_PERCENTAGE,
+                    buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
+                    payment_method: "UPI", // Default/Placeholder
+                    status: "in_escrow",
+                    on_chain_trade_id: tradeId,
+                    escrow_tx_hash: txHash,
+                    created_at: new Date().toISOString(),
+                });
+
+                // 3. Mark Order as Filled/Closed
+                await db.updateOrder(order.id, { status: "filled", filled_amount: order.amount });
+
+                await ctx.editMessageText(
+                    `✅ Trade Started! Trade #${tradeId}\nCheck /mytrades to proceed with payment.`
+                );
+
+                // Notify Seller
+                const seller = await db.getUserById(order.user_id);
+                if (seller && seller.telegram_id) {
+                    await ctx.api.sendMessage(
+                        seller.telegram_id,
+                        `🔔 *New Trade Started!*\n\nBuyer matches your ad for ${formatUSDC(order.amount)}.\nThey will send payment soon.\n\nCheck /mytrades to monitor status.`,
+                        { parse_mode: "Markdown" }
+                    );
+                }
+            } else {
+                // ═══ TAKER IS SELLING (Filling a Buy Order) ═══
+                await ctx.editMessageText("⏳ Initiating trade...");
+
+                const seller = user; // The one clicking the button (Taker)
+                const tokenSymbol = order.token || "USDC";
+                const tokenAddress = tokenSymbol === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+
+                const feeAmount = order.amount * env.FEE_PERCENTAGE;
+                const totalRequired = order.amount + feeAmount;
+
+                // 1. Check Seller's Balance (Must cover Amount + Fee)
+                const balance = await wallet.getTokenBalance(seller.wallet_address!, tokenAddress);
+                if (parseFloat(balance) < totalRequired) {
+                    await ctx.editMessageText(
+                        `❌ *Insufficient ${tokenSymbol} Balance*\n\nYou need *${formatUSDC(totalRequired, tokenSymbol)}* (incl. fee) but have *${formatUSDC(parseFloat(balance), tokenSymbol)}*.\n\nDeposit funds to your wallet: \`${seller.wallet_address}\``,
+                        { parse_mode: "Markdown" }
+                    );
+                    return;
+                }
+
+                await ctx.editMessageText(`⏳ Locking ${tokenSymbol} in escrow...`);
+
+                // 2. Seller sends tokens to Relayer (Admin Wallet)
+                // We use Relayer as an intermediate because Users can't call 'createTrade' directly (gasless exp)
+                // Relayer needs to hold the tokens to call 'createTrade'.
+                const relayerAddress = await wallet.getRelayerAddress();
+
+                // Transfer TOTAL (Amount + Fee) from User -> Relayer
+                await wallet.sendToken(seller.wallet_index, relayerAddress, totalRequired, tokenAddress);
+
+                // 3. Relayer creates Trade on Smart Contract
+                // Buyer = order.user_id (The one who created the Buy Ad)
+                // Seller = seller (Me)
+                const buyerUser = await db.getUserById(order.user_id);
+
+                const { txHash, tradeId } = await wallet.relayerCreateTrade(
+                    buyerUser!.wallet_address!,
+                    order.amount,
+                    tokenAddress
+                );
+
+                // 4. Create Trade Record
+                const trade = await db.createTrade({
+                    order_id: order.id,
+                    buyer_id: order.user_id, // Maker (Buyer)
+                    seller_id: seller.id,    // Taker (Seller)
+                    token: tokenSymbol,
+                    chain: "base",
+                    amount: order.amount,
+                    rate: order.rate,
+                    fiat_amount: order.amount * order.rate,
+                    fiat_currency: "INR",
+                    fee_amount: order.amount * env.FEE_PERCENTAGE,
+                    fee_percentage: env.FEE_PERCENTAGE,
+                    buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
+                    payment_method: "UPI", // Should be selected? Defaulting for now.
+                    status: "in_escrow",
+                    on_chain_trade_id: tradeId,
+                    escrow_tx_hash: txHash,
+                    created_at: new Date().toISOString(),
+                });
+
+                // 5. Mark Order as Filled
+                await db.updateOrder(order.id, { status: "filled", filled_amount: order.amount });
+
+                await ctx.editMessageText(
+                    `✅ Trade Started! Trade #${tradeId}\nWaiting for Buyer to pay.\nCheck /mytrades.`
+                );
+
+                // Notify Buyer (Maker)
+                if (buyerUser && buyerUser.telegram_id) {
+                    await ctx.api.sendMessage(
+                        buyerUser.telegram_id,
+                        `🔔 *Trade Started!* 🟢\n\nSeller matched your Buy Ad for ${formatUSDC(order.amount, tokenSymbol)}.\nCrypto is locked in escrow.\n\n👇 *Pay Now via UPI*`,
+                        { parse_mode: "Markdown" }
+                    );
+                }
+            }
+        } catch (e) {
+            console.error("Trade creation failed:", e);
+            await ctx.editMessageText("❌ Failed to start trade. Blockchain error.");
+        }
+    }
+
+    // Handle buy button (legacy)
+    if (data.startsWith("buy:")) {
+        const orderId = data.replace("buy:", "");
+        const user = await ensureUser(ctx);
+        const order = await db.getOrderById(orderId);
+
+        if (!order || order.status !== "active") {
+            await ctx.answerCallbackQuery({ text: "Order no longer available!" });
+            return;
+        }
+
+        if (order.user_id === user.id) {
+            await ctx.answerCallbackQuery({ text: "You can't buy your own order!" });
+            return;
+        }
+
+        // Show trade confirmation
+        const available = order.amount - order.filled_amount;
+        const feeAmount = available * env.FEE_PERCENTAGE;
+        const buyerReceives = available - feeAmount;
+
+        const keyboard = new InlineKeyboard()
+            .text("✅ Confirm Trade", `confirm_trade:${orderId}`)
+            .text("❌ Cancel", "cancel_action");
+
+        await ctx.editMessageText(
+            [
+                "🤝 *Confirm Trade*",
+                "",
+                `Amount: ${formatUSDC(available)}`,
+                `Rate: ${formatINR(order.rate)}/USDC`,
+                `Total Fiat: ${formatINR(available * order.rate)}`,
+                `Fee (0.5%): ${formatUSDC(feeAmount)}`,
+                `You receive: ${formatUSDC(buyerReceives)}`,
+                "",
+                `Payment: ${order.payment_methods.join(", ")}`,
+                `Seller: @${order.username || "anon"}`,
+                "",
+                "⚠️ After confirming, seller will deposit USDC to escrow.",
+                "You'll then send fiat via the specified payment method.",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+
+        await ctx.answerCallbackQuery();
+    }
+
+    // ─────── TRADE MANAGEMENT HANDLERS ───────
+
+    // View Trade Details
+    if (data.startsWith("trade_view:")) {
+        const tradeId = data.replace("trade_view:", "");
+        const user = await ensureUser(ctx);
+        const trade = await db.getTradeById(tradeId);
+
+        if (!trade) {
+            await ctx.answerCallbackQuery({ text: "Trade not found!" });
+            return;
+        }
+
+        const isBuyer = trade.buyer_id === user.id;
+        const isSeller = trade.seller_id === user.id;
+        const partnerId = isBuyer ? trade.seller_id : trade.buyer_id;
+        const [partner, order] = await Promise.all([
+            db.getUserById(partnerId),
+            db.getOrderById(trade.order_id)
+        ]);
+
+        const statusDescriptions: any = {
+            'in_escrow': isBuyer ? "🟡 Pay the seller now!" : "🟡 Waiting for buyer payment...",
+            'fiat_sent': isBuyer ? "🔵 You marked paid. Waiting for release." : "🔵 Buyer marked paid. Please check bank & Release.",
+            'completed': "✅ Trade Completed.",
+            'disputed': "🔴 Disputed. Admin will review."
+        };
+
+        const details = [
+            `💰 *Trade #${trade.on_chain_trade_id || trade.id.slice(0, 4)}*`,
+            "",
+            `Role: ${isBuyer ? "🟢 Buyer" : "🔴 Seller"}`,
+            `Status: *${trade.status.toUpperCase()}*`,
+            `ℹ️ _${statusDescriptions[trade.status] || ""}_`,
+            "",
+            `Amount: *${formatUSDC(trade.amount, trade.token)}*`,
+            `Fiat: *${formatINR(trade.fiat_amount)}*`,
+            `Rate: ${formatINR(trade.rate)}/${trade.token}`,
+            "",
+            `Partner: @${partner?.username || "anon"}`,
+            `Payment Method: ${trade.payment_method}`,
+        ];
+
+        // If user is buyer, show seller's payment details
+        if (isBuyer && trade.payment_method === "UPI") {
+            // Priority: Order details -> Partner profile
+            const upiFromOrder = (order?.payment_details as any)?.upi;
+            const upiId = upiFromOrder || partner?.upi_id;
+
+            if (upiId) {
+                details.push(`💳 *Seller UPI:* \`${upiId}\``);
+            } else {
+                details.push("⚠️ _Seller hasn't shared UPI in profile._");
+            }
+        }
+
+        details.push("", "━━━━━━━━━━━━━━━━━━━");
+
+        const keyboard = new InlineKeyboard();
+
+        // Buyer Actions
+        if (isBuyer && trade.status === "in_escrow") {
+            details.push("👇 *Action Required:* Send fiat to seller, then click 'I Have Paid'.");
+            keyboard.text("✅ I Have Paid", `trade_pay:${trade.id}`).row();
+            keyboard.text("❌ Cancel Trade", `trade_cancel:${trade.id}`).row();
+        }
+
+        // Seller Actions
+        if (isSeller && trade.status === "fiat_sent") {
+            details.push("👇 *Action Required:* Check your bank. If received, Release Crypto.");
+            keyboard.text("🔓 Release Crypto", `trade_release:${trade.id}`).row();
+            keyboard.text("⚠️ Dispute (Not Received)", `trade_dispute:${trade.id}`).row();
+        }
+
+        // Navigation
+        keyboard.text("🔙 Back to Trades", "mytrades_view"); // Re-trigger /mytrades logic? No, better separate handler.
+        // Actually I'll use text list for now as handler isn't registered for text command but I can use same logic.
+
+        await ctx.editMessageText(details.join("\n"), {
+            parse_mode: "Markdown",
+            reply_markup: keyboard
+        });
+        await ctx.answerCallbackQuery();
+    }
+
+    // Buyer Marks Paid
+    if (data.startsWith("trade_pay:")) {
+        const tradeId = data.replace("trade_pay:", "");
+        const trade = await db.getTradeById(tradeId);
+        if (!trade) return;
+
+        await db.updateTrade(tradeId, { status: "fiat_sent" });
+        await ctx.answerCallbackQuery({ text: "Marked as Paid! Seller notified." });
+
+        const keyboard = new InlineKeyboard().text("👁️ Refresh Details", `trade_view:${tradeId}`);
+        await ctx.editMessageText("✅ You marked this trade as PAID. Waiting for seller to release.", { reply_markup: keyboard });
+
+        // Notify Seller
+        const seller = await db.getUserById(trade.seller_id);
+        if (seller && seller.telegram_id) {
+            await ctx.api.sendMessage(
+                seller.telegram_id,
+                `💰 *Payment Marked as Sent!*\n\nBuyer says they have paid for Trade #${trade.on_chain_trade_id}.\n\nPlease check your bank account.\nIf received, click Release in /mytrades.`,
+                { parse_mode: "Markdown" }
+            );
+        }
+    }
+
+    // Seller Releases Crypto
+    if (data.startsWith("trade_release:")) {
+        const tradeId = data.replace("trade_release:", "");
+        const trade = await db.getTradeById(tradeId);
+
+        if (!trade || trade.status === "completed") {
+            await ctx.answerCallbackQuery({ text: "Trade already completed!" });
+            return;
+        }
+
+        await ctx.editMessageText("⏳ Releasing funds on blockchain... This may take a moment.");
+
+        try {
+            // Relayer calls Smart Contract Release
+            const txHash = await wallet.relayerReleaseTrade(trade.on_chain_trade_id!);
+
+            await db.updateTrade(tradeId, { status: "completed", escrow_tx_hash: txHash });
+
+            await ctx.editMessageText(
+                [
+                    "✅ *Crypto Released!*",
+                    "",
+                    "Trade completed successfully.",
+                    `🔗 [View Transaction](${escrow.getExplorerUrl(txHash)})`,
+                ].join("\n"),
+                { parse_mode: "Markdown" }
+            );
+
+            // Broadcast Success (Group Specific)
+            try {
+                const order = await db.getOrderById(trade.order_id);
+                const targetGroup = (order?.payment_details as any)?.group_id;
+
+                if (targetGroup) {
+                    await ctx.api.sendMessage(
+                        String(targetGroup),
+                        `✅ *Trade Completed!* 🎉\n\n💰 Volume: *${formatUSDC(trade.amount)}*\n🤝 P2P Swap executed successfully.\n\nStart trading now: /start`,
+                        { parse_mode: "Markdown" }
+                    ).catch(e => console.error(`Group Broadcast failed to ${targetGroup}:`, e));
+
+                } else if (env.BROADCAST_CHANNEL_ID) {
+                    await ctx.api.sendMessage(
+                        env.BROADCAST_CHANNEL_ID,
+                        `✅ *Trade Completed!* 🎉\n\n💰 Volume: *${formatUSDC(trade.amount)}*\n🤝 P2P Swap executed successfully.\n\nStart trading now: /start`,
+                        { parse_mode: "Markdown" }
+                    ).catch(e => console.error("Admin Broadcast failed:", e));
+                }
+            } catch (e) {
+                console.error("Trade broadcast error:", e);
+            }
+
+            // Notify Buyer
+            const buyer = await db.getUserById(trade.buyer_id);
+            if (buyer && buyer.telegram_id) {
+                await ctx.api.sendMessage(
+                    buyer.telegram_id,
+                    `✅ *Trade Completed!*\n\nSeller has released ${formatUSDC(trade.amount)} USDC.\nThe funds are now in your wallet (smart contract release).\n\nTransaction: [View on BaseScan](${escrow.getExplorerUrl(txHash)})`,
+                    { parse_mode: "Markdown" }
+                );
+            }
+
+        } catch (error) {
+            console.error("Release failed:", error);
+            await ctx.editMessageText("❌ Release failed. Please try again or contact support.");
+        }
+    }
+
+    // Dispute
+    if (data.startsWith("trade_dispute:")) {
+        const tradeId = data.replace("trade_dispute:", "");
+        await db.updateTrade(tradeId, { status: "disputed" });
+        await ctx.editMessageText("⚠️ Dispute opened. Support will review this case.");
+    }
+
+    // My Trades View Handler (Button)
+    if (data === "mytrades_view") {
+        const user = await ensureUser(ctx);
+        try {
+            const trades = await db.getUserTrades(user.id);
+
+            if (trades.length === 0) {
+                await ctx.editMessageText("📭 You have no active trades.");
+                await ctx.answerCallbackQuery();
+                return;
+            }
+
+            const keyboard = new InlineKeyboard();
+
+            const statusMap: any = {
+                'created': '🆕 Created',
+                'in_escrow': '🟡 In Escrow',
+                'fiat_sent': '🔵 Paid',
+                'completed': '✅ Completed',
+                'disputed': '🔴 Disputed',
+                'cancelled': '❌ Cancelled'
+            };
+
+            trades.forEach((t: any) => {
+                const isBuyer = t.buyer_id === user.id;
+                const role = isBuyer ? "🟢 Buying" : "🔴 Selling";
+                const amt = formatUSDC(t.amount, t.token);
+                const status = statusMap[t.status] || t.status;
+
+                keyboard.text(`${role} ${amt} (${status})`, `trade_view:${t.id}`).row();
+            });
+
+            await ctx.editMessageText("📋 *Your Trades*\nSelect a trade to view actions:", {
+                parse_mode: "Markdown",
+                reply_markup: keyboard
+            });
+        } catch (e) {
+            console.error("MyTrades error:", e);
+            await ctx.answerCallbackQuery({ text: "❌ Failed to fetch trades." });
+        }
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle dispute resolution
+    if (data.startsWith("resolve:")) {
+        if (!isAdmin(ctx)) {
+            await ctx.answerCallbackQuery({ text: "Admin only!" });
+            return;
+        }
+
+        const [, tradeId, action] = data.split(":");
+        const releaseToBuyer = action === "buyer";
+
+        try {
+            // Update database
+            await db.updateTrade(tradeId, {
+                status: "resolved",
+                resolution: releaseToBuyer ? "Released to buyer" : "Refunded to seller",
+                resolved_by: (await ensureUser(ctx)).id,
+            });
+
+            await ctx.editMessageText(
+                `✅ Dispute resolved! ${releaseToBuyer ? "Released to buyer" : "Refunded to seller"}.`
+            );
+        } catch (error) {
+            await ctx.answerCallbackQuery({ text: "Failed to resolve dispute." });
+        }
+    }
+
+    // Handle cancel
+    if (data === "cancel_action") {
+        await ctx.editMessageText("❌ Action cancelled.");
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle setup UPI button
+    if (data === "setup_upi") {
+        ctx.session.awaiting_input = "upi_id";
+        await ctx.editMessageText(
+            [
+                "📱 *Enter your UPI ID*",
+                "",
+                "Type your UPI ID below:",
+                "",
+                "Examples: `yourname@upi`, `9876543210@paytm`",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle export key button (from /wallet)
+    if (data === "export_key") {
+        // Redirect to /export flow with confirmation
+        const user = await ensureUser(ctx);
+        if (!user.wallet_address || !env.MASTER_WALLET_SEED) {
+            await ctx.answerCallbackQuery({ text: "No wallet found!" });
+            return;
+        }
+
+        const keyboard = new InlineKeyboard()
+            .text("⚠️ Yes, show my private key", "confirm_export")
+            .row()
+            .text("❌ Cancel", "cancel_action");
+
+        await ctx.editMessageText(
+            [
+                "🔒 *Export Private Key*",
+                "",
+                "⚠️ *WARNING:*",
+                "• Anyone with your private key can STEAL your funds",
+                "• NEVER share it with anyone",
+                "• The key will auto-delete in 60 seconds",
+                "",
+                "Are you sure?",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        await ctx.answerCallbackQuery();
+    }
+
+    // Handle confirm export — SHOW THE KEY
+    if (data === "confirm_export") {
+        const user = await ensureUser(ctx);
+
+        if (!user.wallet_address || !env.MASTER_WALLET_SEED) {
+            await ctx.answerCallbackQuery({ text: "No wallet found!" });
+            return;
+        }
+
+        try {
+            const derived = wallet.deriveWallet(user.wallet_index);
+
+            // Send the key
+            const keyMsg = await ctx.reply(
+                [
+                    "🔐 *YOUR PRIVATE KEY*",
+                    "",
+                    `\`${derived.privateKey}\``,
+                    "",
+                    `Address: \`${derived.address}\``,
+                    "",
+                    "⚠️ This message will self-destruct in 60 seconds.",
+                    "📸 Screenshot it NOW and store it safely!",
+                    "",
+                    "With this key you can import your wallet into:",
+                    "• MetaMask",
+                    "• Trust Wallet",
+                    "• Rabby",
+                    "• Any EVM wallet",
+                ].join("\n"),
+                { parse_mode: "Markdown" }
+            );
+
+            // Delete the confirmation message
+            await ctx.editMessageText("✅ Private key sent below ⬇️ (auto-deletes in 60s)");
+
+            // Auto-delete key message after 60 seconds
+            setTimeout(async () => {
+                try {
+                    await ctx.api.deleteMessage(keyMsg.chat.id, keyMsg.message_id);
+                    await ctx.api.sendMessage(keyMsg.chat.id,
+                        "🗑️ Private key message deleted for security.\n\nUse /export again if needed."
+                    );
+                } catch {
+                    // Message may already be deleted
+                }
+            }, 60000);
+
+            await ctx.answerCallbackQuery();
+        } catch (error) {
+            console.error("Export error:", error);
+            await ctx.answerCallbackQuery({ text: "Failed to export key." });
+        }
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//              NATURAL LANGUAGE HANDLER (AI)
+// ═══════════════════════════════════════════════════════════════
+
+bot.on("message:text", async (ctx) => {
+    const text = ctx.message.text;
+
+    // Skip commands
+    if (text.startsWith("/")) return;
+
+    const user = await ensureUser(ctx);
+
+    // Handle awaiting input states
+    if (ctx.session.awaiting_input === "wallet_address") {
+        // Validate Ethereum address
+        if (/^0x[a-fA-F0-9]{40}$/.test(text.trim())) {
+            await db.updateUser(user.id, { wallet_address: text.trim() });
+            ctx.session.awaiting_input = undefined;
+            ctx.session.wallet_address = text.trim();
+            await ctx.reply(`✅ Wallet set to \`${truncateAddress(text.trim())}\`\n\nYou're ready to trade! Try /sell or /buy`, { parse_mode: "Markdown" });
+            return;
+        } else {
+            await ctx.reply("❌ Invalid address. Please send a valid Base wallet address (0x...)");
+            return;
+        }
+    }
+
+    // --- SEND CRYPTO FLOW ---
+    if (ctx.session.awaiting_input === "send_to_address") {
+        const addr = text.trim();
+        if (/^0x[a-fA-F0-9]{40}$/.test(addr)) {
+            ctx.session.send_draft = { ...ctx.session.send_draft, to_address: addr };
+            ctx.session.awaiting_input = "send_amount";
+
+            const token = ctx.session.send_draft?.token || "USDC";
+
+            await ctx.reply(
+                [
+                    "💸 *Send Crypto — Step 2/3*",
+                    "",
+                    `Token: *${token}*`,
+                    `To: \`${truncateAddress(addr)}\``,
+                    "",
+                    `How much ${token} do you want to send?`,
+                    "",
+                    "Send the amount (e.g., `100`):",
+                ].join("\n"),
+                { parse_mode: "Markdown" }
+            );
+            return;
+        } else {
+            await ctx.reply("❌ Invalid address. Please send a valid wallet address (0x...)");
+            return;
+        }
+    }
+
+    if (ctx.session.awaiting_input === "send_amount") {
+        const amount = parseFloat(text.trim());
+        if (isNaN(amount) || amount <= 0) {
+            await ctx.reply("❌ Invalid amount. Please send a number.");
+            return;
+        }
+
+        const draft = ctx.session.send_draft;
+        if (!draft) return;
+
+        const token = draft.token || "USDC";
+        const addr = draft.to_address || "";
+
+        // Check balance
+        const balance = draft.token === "ETH"
+            ? await wallet.getEthBalance(user.wallet_address!)
+            : await wallet.getTokenBalance(user.wallet_address!, draft.token_address!);
+
+        if (parseFloat(balance) < amount) {
+            await ctx.reply(`❌ Insufficient balance! Your ${token} balance is ${balance}.`);
+            return;
+        }
+
+        if (ctx.session.send_draft) {
+            ctx.session.send_draft.amount = amount;
+        }
+        ctx.session.awaiting_input = undefined;
+
+        const keyboard = new InlineKeyboard()
+            .text("✅ Confirm & Send", "confirm_send")
+            .text("❌ Cancel", "cancel_action");
+
+        await ctx.reply(
+            [
+                "💸 *Send Crypto — Final Step*",
+                "",
+                `Token: *${token}*`,
+                `Amount: *${amount} ${token}*`,
+                `To: \`${addr}\``,
+                "",
+                "⚠️ *Confirm this transaction?*",
+                "This action cannot be undone.",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        return;
+    }
+
+    if (ctx.session.awaiting_input === "upi_id") {
+        const upiId = text.trim().toLowerCase();
+
+        // Basic UPI format validation
+        if (!upiId.includes("@") || upiId.length < 5) {
+            await ctx.reply(
+                [
+                    "❌ Invalid UPI format.",
+                    "",
+                    "UPI IDs look like: `yourname@upi`",
+                    "",
+                    "Try again or send /upi to skip.",
+                ].join("\n"),
+                { parse_mode: "Markdown" }
+            );
+            return;
+        }
+
+        await db.updateUser(user.id, { upi_id: upiId });
+        ctx.session.awaiting_input = undefined;
+
+        const keyboard = new InlineKeyboard()
+            .text("📢 Create Ad Now", "newad_start")
+            .text("🔍 Browse Ads", "ads:all");
+
+        await ctx.reply(
+            [
+                "✅ *UPI ID Saved!*",
+                "",
+                `📱 UPI: \`${upiId}\``,
+                "",
+                "You're all set! What would you like to do?",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        return;
+    }
+
+    // ─────── GUIDED AD CREATION (Step-by-Step) ───────
+
+    // Step 1: User sends AMOUNT
+    if (ctx.session.awaiting_input?.startsWith("ad_amount_")) {
+        const adType = ctx.session.awaiting_input.replace("ad_amount_", "");
+        const amount = parseFloat(text.trim());
+
+        if (isNaN(amount) || amount <= 0) {
+            await ctx.reply("❌ Invalid amount. Send a number like `100` or `50.5`", { parse_mode: "Markdown" });
+            return;
+        }
+
+        const token = ctx.session.ad_draft?.token || "USDC";
+        const minAmount = 1;
+
+        if (amount < minAmount) {
+            await ctx.reply(`❌ Minimum amount is ${minAmount} ${token}.`);
+            return;
+        }
+
+        if (amount > 50000) {
+            await ctx.reply(`❌ Maximum amount is 50,000 ${token}.`);
+            return;
+        }
+
+        // Store amount in session (preserve token) and ask for rate
+        ctx.session.ad_draft = { ...ctx.session.ad_draft, type: adType, amount };
+
+        ctx.session.awaiting_input = `ad_rate_${adType}`;
+
+        await ctx.reply(
+            [
+                `📢 *Create ${adType.toUpperCase()} Ad — Step 2/3*`,
+                "",
+                `Amount: *${formatUSDC(amount, token)}*  ✅`,
+                "",
+                `What's your rate in INR per ${token}?`,
+                "",
+                "Send the rate (e.g., `88` or `92.5`):",
+                "",
+                `_Market rate: ~₹85-90/${token}_`,
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+        return;
+    }
+
+    // Step 2: User sends RATE
+    if (ctx.session.awaiting_input?.startsWith("ad_rate_")) {
+        const adType = ctx.session.awaiting_input.replace("ad_rate_", "");
+        const rate = parseFloat(text.trim());
+
+        if (isNaN(rate) || rate <= 0) {
+            await ctx.reply("❌ Invalid rate. Send a number like `88` or `92.5`", { parse_mode: "Markdown" });
+            return;
+        }
+
+        if (rate < 50 || rate > 200) {
+            await ctx.reply("⚠️ Rate seems unusual. Normal range: ₹50-200/USDC. Send again or continue.");
+        }
+
+        // Store rate in session and ask for payment method
+        ctx.session.ad_draft = { ...ctx.session.ad_draft, rate };
+        const token = ctx.session.ad_draft?.token || "USDC";
+
+        ctx.session.awaiting_input = `ad_payment_${adType}`;
+        const draft = ctx.session.ad_draft!;
+
+        const keyboard = new InlineKeyboard()
+            .text("💳 UPI", `ad_pay:upi`)
+            .text("🏦 IMPS", `ad_pay:imps`)
+            .row()
+            .text("🏦 NEFT", `ad_pay:neft`)
+            .text("💳 All Methods", `ad_pay:all`);
+
+        await ctx.reply(
+            [
+                `📢 *Create ${adType.toUpperCase()} Ad — Step 3/3*`,
+                "",
+                `Amount: *${formatUSDC(draft.amount ?? 0, token)}*  ✅`,
+                `Rate: *${formatINR(rate)}/${token}*  ✅`,
+                `Total: *${formatINR((draft.amount ?? 0) * rate)}*`,
+                "",
+                "Select payment method:",
+            ].join("\n"),
+            { parse_mode: "Markdown", reply_markup: keyboard }
+        );
+        return;
+    }
+
+    // Try AI intent parsing
+    try {
+        // Save to conversation history
+        ctx.session.conversation_history = ctx.session.conversation_history || [];
+        ctx.session.conversation_history.push({ role: "user", content: text });
+
+        // If OpenAI is configured, use AI parsing
+        let intent;
+        if (env.OPENAI_API_KEY) {
+            intent = await ai.parseIntent(text, ctx.session.conversation_history);
+        } else {
+            // Fallback to keyword matching
+            intent = (ai as any).fallbackParse
+                ? (ai as any).fallbackParse(text)
+                : { intent: "UNKNOWN", confidence: 0, params: {}, response: "" };
+        }
+
+        // Save AI response to history
+        ctx.session.conversation_history.push({
+            role: "assistant",
+            content: intent.response,
+        });
+
+        // Keep history manageable
+        if (ctx.session.conversation_history.length > 20) {
+            ctx.session.conversation_history = ctx.session.conversation_history.slice(-10);
+        }
+
+        // Route based on intent
+        switch (intent.intent) {
+            case "CREATE_SELL_ORDER":
+                if (intent.params.amount && intent.params.rate) {
+                    // We have enough info to create the order
+                    const keyboard = new InlineKeyboard()
+                        .text("✅ Confirm Order", `create_sell:${intent.params.amount}:${intent.params.rate}`)
+                        .text("❌ Cancel", "cancel_action");
+
+                    const feeAmt = intent.params.amount * env.FEE_PERCENTAGE;
+                    await ctx.reply(
+                        [
+                            "📝 *Create Sell Order*",
+                            "",
+                            `Amount: ${formatUSDC(intent.params.amount)}`,
+                            `Rate: ${formatINR(intent.params.rate)}/USDC`,
+                            `Total: ${formatINR(intent.params.amount * intent.params.rate)}`,
+                            `Fee (0.5%): ${formatUSDC(feeAmt)}`,
+                            `Buyer receives: ${formatUSDC(intent.params.amount - feeAmt)}`,
+                            `Payment: ${intent.params.paymentMethod || "UPI"}`,
+                            "",
+                            "Confirm to list this order?",
+                        ].join("\n"),
+                        { parse_mode: "Markdown", reply_markup: keyboard }
+                    );
+                } else {
+                    await ctx.reply(intent.response || "Please provide amount and rate.\n\nExample: *sell 100 usdc at 88*", { parse_mode: "Markdown" });
+                }
+                break;
+
+            case "VIEW_ORDERS":
+                // Trigger /orders logic
+                await ctx.reply("📊 Loading orders...");
+                // Re-use orders command
+                try {
+                    const orders = await db.getActiveOrders(undefined, "USDC", 10);
+                    if (orders.length === 0) {
+                        await ctx.reply("No orders available right now. Be the first! /sell");
+                    } else {
+                        const list = orders.map((o, i) => formatOrder(o, i)).join("\n\n");
+                        await ctx.reply(`📊 *Order Book*\n\n${list}`, { parse_mode: "Markdown" });
+                    }
+                } catch {
+                    await ctx.reply("❌ Could not load orders.");
+                }
+                break;
+
+            case "CHECK_BALANCE":
+                if (user.wallet_address) {
+                    try {
+                        const balance = await escrow.getBalance(user.wallet_address);
+                        await ctx.reply(`💰 Balance: *${balance} USDC*\n\nAddress: \`${truncateAddress(user.wallet_address)}\``, { parse_mode: "Markdown" });
+                    } catch {
+                        await ctx.reply("⚠️ Could not fetch balance right now.");
+                    }
+                } else {
+                    await ctx.reply("No wallet set! Use /wallet to set your address.");
+                }
+                break;
+
+            case "SEND_CRYPTO":
+                {
+                    const amount = intent.params.amount;
+                    const token = intent.params.token || "USDC";
+                    const addr = intent.params.address;
+
+                    if (amount && addr && /^0x[a-fA-F0-9]{40}$/.test(addr)) {
+                        // User gave all details, jump to payment checks
+                        const tokenUpper = token.toUpperCase();
+                        const tokenAddress = tokenUpper === "ETH" ? "native" : (tokenUpper === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS);
+
+                        ctx.session.send_draft = {
+                            to_address: addr,
+                            token: tokenUpper,
+                            token_address: tokenAddress,
+                            amount: parseFloat(amount)
+                        };
+
+                        // Check balance
+                        const balance = tokenUpper === "ETH"
+                            ? await wallet.getEthBalance(user.wallet_address!)
+                            : await wallet.getTokenBalance(user.wallet_address!, tokenAddress);
+                        if (parseFloat(balance) < parseFloat(amount)) {
+                            await ctx.reply(`❌ Insufficient balance! Your ${token.toUpperCase()} balance is ${balance}.`);
+                            return;
+                        }
+
+                        const keyboard = new InlineKeyboard()
+                            .text("✅ Confirm & Send", "confirm_send")
+                            .text("❌ Cancel", "cancel_action");
+
+                        await ctx.reply(
+                            [
+                                "💸 *Send Crypto — AI Confirmation*",
+                                "",
+                                `Token: *${token.toUpperCase()}*`,
+                                `Amount: *${amount} ${token.toUpperCase()}*`,
+                                `To: \`${addr}\``,
+                                "",
+                                "⚠️ *Confirm this transaction?*",
+                                "This action cannot be undone.",
+                            ].join("\n"),
+                            { parse_mode: "Markdown", reply_markup: keyboard }
+                        );
+                    } else {
+                        // Not enough details, start the flow
+                        ctx.session.send_draft = {};
+                        const keyboard = new InlineKeyboard()
+                            .text("💵 USDC", "send_token:USDC")
+                            .text("dt USDT", "send_token:USDT")
+                            .text("💎 ETH", "send_token:ETH")
+                            .row()
+                            .text("❌ Cancel", "cancel_action");
+
+                        await ctx.reply(
+                            [
+                                "💸 *Withdraw Crypto*",
+                                "",
+                                "I can help you send crypto to any Base wallet.",
+                                "",
+                                "Which token would you like to send?",
+                            ].join("\n"),
+                            { parse_mode: "Markdown", reply_markup: keyboard }
+                        );
+                    }
+                }
+                break;
+
+            case "BRIDGE_TOKENS":
+                await ctx.reply(
+                    [
+                        "🌉 *Bridge Tokens*",
+                        "",
+                        intent.response,
+                        "",
+                        'Tell me the full details, e.g.:',
+                        '"bridge 50 usdc from base to ethereum"',
+                    ].join("\n"),
+                    { parse_mode: "Markdown" }
+                );
+                break;
+
+            case "HELP":
+                await ctx.reply(intent.response || "Type /help for full instructions!");
+                break;
+
+            case "PROFILE":
+                // Trigger profile command
+                await ctx.api.sendMessage(ctx.chat.id, "Loading profile...");
+                break;
+
+            default:
+                await ctx.reply(intent.response || "I'm not sure what you mean. Try /help to see what I can do! 🤖");
+        }
+    } catch (error) {
+        console.error("Message handler error:", error);
+        await ctx.reply("🤖 Something went wrong. Try again or use /help for commands.");
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//              PHOTO HANDLER (Payment Proofs)
+// ═══════════════════════════════════════════════════════════════
+
+bot.on("message:photo", async (ctx) => {
+    const user = await ensureUser(ctx);
+
+    if (ctx.session.current_trade_id) {
+        // Save the photo as payment proof
+        const photo = ctx.message.photo[ctx.message.photo.length - 1]; // Highest resolution
+        const fileId = photo.file_id;
+
+        await ctx.reply(
+            [
+                "📸 *Payment proof received!*",
+                "",
+                `Trade: \`${ctx.session.current_trade_id.slice(0, 8)}\``,
+                `File saved: ✅`,
+                "",
+                "The seller will be notified.",
+                "If they don't respond within 45 minutes, your crypto will be auto-released.",
+            ].join("\n"),
+            { parse_mode: "Markdown" }
+        );
+    } else {
+        await ctx.reply(
+            "📸 Got your photo! If this is a payment proof, first start a trade and then send the proof."
+        );
+    }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//                    ERROR HANDLER
+// ═══════════════════════════════════════════════════════════════
+
+bot.catch((err) => {
+    console.error("Bot error:", err);
+});
+
+export { bot };

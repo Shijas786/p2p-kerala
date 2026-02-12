@@ -1,0 +1,42 @@
+{
+  "name": "p2pkerala",
+  "version": "1.0.0",
+  "description": "P2P Kerala — Telegram P2P Crypto Exchange Bot",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "build": "tsc",
+    "serve": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "p2p",
+    "crypto",
+    "telegram",
+    "bot",
+    "escrow"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@grammyjs/conversations": "^2.0.3",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@supabase/supabase-js": "^2.49.4",
+    "axios": "^1.8.1",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.13.5",
+    "grammy": "^1.35.1",
+    "ioredis": "^5.6.0",
+    "openai": "^4.85.4",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/node": "^22.13.4",
+    "hardhat": "^2.28.6",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
