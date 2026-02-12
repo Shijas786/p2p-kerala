@@ -289,42 +289,42 @@
                             data-telegram-login="P2PKerala_basebot" 
                             data-size="medium" 
                             data-onauth="onTelegramAuth(user)" 
-                            data-request-access="write"></script>
+                            data-request-access="write"><\/script>
     `;
-    }
-    }
+            }
+        }
 
 
 
-    // Callback from Telegram Widget
-    async function onTelegramAuth(user) {
-    // Verify with our backend
-    try {
-    const res = await fetch('/api/auth', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(user)
-    });
+        // Callback from Telegram Widget
+        async function onTelegramAuth(user) {
+            // Verify with our backend
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(user)
+                });
 
-    const data = await res.json();
+                const data = await res.json();
 
-    if (data.success) {
-    localStorage.setItem('p2pkerala_user', JSON.stringify(data.user));
-    window.location.href = '/dashboard.html';
-    } else {
-    alert('Login failed: ' + data.error);
-    }
-    } catch (e) {
-    console.error("Auth error", e);
-    alert('Login failed. Please try again.');
-    }
-    }
+                if (data.success) {
+                    localStorage.setItem('p2pkerala_user', JSON.stringify(data.user));
+                    window.location.href = '/dashboard.html';
+                } else {
+                    alert('Login failed: ' + data.error);
+                }
+            } catch (e) {
+                console.error("Auth error", e);
+                alert('Login failed. Please try again.');
+            }
+        }
 
-    // Initialize
-    checkAuth();
-    fetchStats();
-    fetchAds();
-    setInterval(() => { fetchStats(); fetchAds(); }, 30000);
+        // Initialize
+        checkAuth();
+        fetchStats();
+        fetchAds();
+        setInterval(() => { fetchStats(); fetchAds(); }, 30000);
     </script>
 </body>
 
