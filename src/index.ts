@@ -50,8 +50,8 @@ async function main() {
     // Health Check (Koyeb needs a 200 OK)
     app.get("/health", (req, res) => res.send("OK"));
 
-    // Fallback file serving
-    app.get("*", (req, res) => {
+    // Fallback file serving (Express v5 uses {*path} instead of *)
+    app.get("/{*path}", (req, res) => {
         res.sendFile(path.join(process.cwd(), "public", "index.html"));
     });
 
