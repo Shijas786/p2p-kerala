@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>P2P Kerala — Crypto Made Simple</title>
     <meta name="description"
-        content="Kerala's safest P2P crypto marketplace. Buy & sell USDC instantly via Telegram with smart contract escrow and AI verification.">
+        content="Kerala's safest P2P crypto marketplace on Telegram. Smart contract escrow, AI verification, zero KYC.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
@@ -21,16 +21,21 @@
         }
 
         :root {
-            --bg: #030712;
-            --accent: #34d399;
-            --accent2: #60a5fa;
-            --accent3: #a78bfa;
-            --accent4: #fb923c;
-            --text: #f1f5f9;
-            --text2: #94a3b8;
-            --muted: #475569;
-            --card: rgba(255, 255, 255, 0.03);
+            --bg: #0a0a0a;
+            --bg2: #111111;
+            --card: #141414;
+            --card2: #1a1a1a;
             --border: rgba(255, 255, 255, 0.06);
+            --border-h: rgba(255, 255, 255, 0.12);
+            --text: #ffffff;
+            --text2: #999999;
+            --text3: #555555;
+            --accent: #f59e0b;
+            --accent-rgb: 245, 158, 11;
+            --accent2: #34d399;
+            --accent2-rgb: 52, 211, 153;
+            --radius: 20px;
+            --radius-sm: 14px;
         }
 
         html {
@@ -42,65 +47,53 @@
             background: var(--bg);
             color: var(--text);
             overflow-x: hidden;
-        }
-
-        /* ═══════ PARTICLES CANVAS ═══════ */
-        #particles {
-            position: fixed;
-            inset: 0;
-            z-index: 0;
-            pointer-events: none;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.6;
         }
 
         /* ═══════ NAV ═══════ */
         nav {
-            position: fixed;
+            position: sticky;
             top: 0;
-            left: 0;
-            right: 0;
             z-index: 100;
             padding: 1rem 2rem;
-            transition: all 0.5s;
-        }
-
-        nav.scrolled {
-            background: rgba(3, 7, 18, 0.9);
+            background: rgba(10, 10, 10, 0.8);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
         }
 
         .nav-inner {
-            max-width: 1200px;
+            max-width: 1300px;
             margin: 0 auto;
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
 
-        .logo {
-            font-size: 1.4rem;
-            font-weight: 800;
+        .nav-brand {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            font-weight: 800;
+            font-size: 1.1rem;
+            text-decoration: none;
+            color: var(--text);
         }
 
-        .logo span {
-            background: linear-gradient(135deg, var(--accent), var(--accent2));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .nav-brand span {
+            color: var(--accent);
         }
 
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: 2rem;
         }
 
         .nav-links a {
             text-decoration: none;
             color: var(--text2);
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 500;
             transition: color 0.3s;
         }
@@ -110,66 +103,109 @@
         }
 
         .nav-cta {
-            background: linear-gradient(135deg, var(--accent), #2dd4bf);
-            color: var(--bg) !important;
-            -webkit-text-fill-color: var(--bg) !important;
-            padding: 0.55rem 1.3rem;
-            border-radius: 100px;
+            background: var(--accent) !important;
+            color: #000 !important;
             font-weight: 700 !important;
+            padding: 0.55rem 1.4rem;
+            border-radius: 10px;
             transition: transform 0.2s, box-shadow 0.3s;
         }
 
         .nav-cta:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 30px rgba(52, 211, 153, 0.2);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 30px rgba(var(--accent-rgb), 0.25);
         }
 
-        /* ═══════ SCROLL PROGRESS BAR ═══════ */
-        .progress-bar {
-            position: fixed;
-            top: 0;
-            left: 0;
-            height: 3px;
-            z-index: 999;
-            background: linear-gradient(90deg, var(--accent), var(--accent2), var(--accent3));
-            width: 0%;
-            transition: width 0.1s linear;
+        /* ═══════ CONTAINER ═══════ */
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* ═══════ PARTNER BAR ═══════ */
+        .partner-bar {
+            padding: 1.5rem 0;
+            border-bottom: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .partner-bar p {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text3);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 1.2rem;
+        }
+
+        .partner-logos {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3rem;
+            flex-wrap: wrap;
+        }
+
+        .partner-logos span {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text3);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            letter-spacing: 0.02em;
+            transition: color 0.3s;
+        }
+
+        .partner-logos span:hover {
+            color: var(--text2);
+        }
+
+        .partner-logos .dot {
+            color: var(--accent);
+            font-size: 1.2rem;
         }
 
         /* ═══════ HERO ═══════ */
         .hero {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            padding: 5rem 0 3rem;
             text-align: center;
-            padding: 6rem 1.5rem 4rem;
             position: relative;
-            z-index: 1;
         }
 
-        .hero-badge {
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 800px;
+            height: 600px;
+            background: radial-gradient(ellipse, rgba(var(--accent-rgb), 0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .hero-tag {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            background: var(--card);
-            border: 1px solid var(--border);
+            background: rgba(var(--accent-rgb), 0.08);
+            border: 1px solid rgba(var(--accent-rgb), 0.15);
             padding: 0.4rem 1rem;
             border-radius: 100px;
-            font-size: 0.8rem;
-            color: var(--accent);
+            font-size: 0.75rem;
             font-weight: 600;
+            color: var(--accent);
             margin-bottom: 2rem;
-            animation: slideUp 0.8s ease-out 0.2s both;
         }
 
-        .pulse-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--accent);
+        .hero-tag .pulse {
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            animation: pulse 2s infinite;
+            background: var(--accent);
+            animation: pulse 2s ease-in-out infinite;
         }
 
         @keyframes pulse {
@@ -177,631 +213,393 @@
             0%,
             100% {
                 opacity: 1;
-                transform: scale(1)
             }
 
             50% {
-                opacity: .5;
-                transform: scale(1.5)
+                opacity: 0.3;
             }
         }
 
         .hero h1 {
-            font-size: clamp(2.8rem, 7vw, 5.5rem);
-            font-weight: 900;
-            line-height: 1.05;
-            letter-spacing: -0.04em;
+            font-size: clamp(2.5rem, 5.5vw, 3.8rem);
+            font-weight: 800;
+            line-height: 1.1;
+            letter-spacing: -0.03em;
             margin-bottom: 1.5rem;
-            animation: slideUp 0.8s ease-out 0.4s both;
+            max-width: 750px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .hero .gradient-text {
-            background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
+        .hero h1 .glow {
+            background: linear-gradient(135deg, var(--accent), #fbbf24, #f97316);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            background-size: 300% 300%;
-            animation: gradientShift 6s ease infinite;
-        }
-
-        @keyframes gradientShift {
-
-            0%,
-            100% {
-                background-position: 0% 50%
-            }
-
-            50% {
-                background-position: 100% 50%
-            }
+            background-clip: text;
         }
 
         .hero p {
-            font-size: clamp(0.95rem, 2vw, 1.2rem);
+            font-size: 1.05rem;
             color: var(--text2);
-            max-width: 550px;
+            max-width: 520px;
             margin: 0 auto 2.5rem;
             line-height: 1.7;
-            animation: slideUp 0.8s ease-out 0.6s both;
         }
 
-        .hero-cta {
+        .hero-btns {
             display: flex;
             gap: 1rem;
-            flex-wrap: wrap;
             justify-content: center;
-            animation: slideUp 0.8s ease-out 0.8s both;
+            flex-wrap: wrap;
         }
 
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(40px)
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0)
-            }
-        }
-
-        .btn-glow {
+        .btn-primary {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            background: linear-gradient(135deg, var(--accent), #2dd4bf);
-            color: var(--bg);
-            padding: 1rem 2.2rem;
-            border-radius: 14px;
+            background: var(--accent);
+            color: #000;
+            padding: 0.8rem 2rem;
+            border-radius: 12px;
             font-weight: 700;
-            font-size: 1rem;
+            font-size: 0.9rem;
             text-decoration: none;
             transition: transform 0.2s, box-shadow 0.3s;
-            border: none;
-            cursor: pointer;
-            position: relative;
-            overflow: hidden;
         }
 
-        .btn-glow::after {
-            content: '';
-            position: absolute;
-            inset: -2px;
-            background: linear-gradient(135deg, var(--accent), var(--accent2), var(--accent3));
-            border-radius: 16px;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s;
-            filter: blur(15px);
-        }
-
-        .btn-glow:hover {
+        .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 15px 50px rgba(52, 211, 153, 0.25);
+            box-shadow: 0 12px 40px rgba(var(--accent-rgb), 0.3);
         }
 
-        .btn-glow:hover::after {
-            opacity: 1;
-        }
-
-        .btn-ghost {
+        .btn-secondary {
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
             background: transparent;
-            border: 1px solid var(--border);
             color: var(--text);
-            padding: 1rem 2.2rem;
-            border-radius: 14px;
-            font-weight: 600;
-            font-size: 1rem;
-            text-decoration: none;
-            transition: background 0.3s, border-color 0.3s;
-            cursor: pointer;
-        }
-
-        .btn-ghost:hover {
-            background: rgba(255, 255, 255, 0.05);
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        /* ─── Scroll Indicator ─── */
-        .scroll-indicator {
-            position: absolute;
-            bottom: 2rem;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideUp 1s ease-out 1.2s both;
-        }
-
-        .scroll-mouse {
-            width: 24px;
-            height: 38px;
-            border: 2px solid var(--muted);
+            padding: 0.8rem 2rem;
             border-radius: 12px;
-            position: relative;
-        }
-
-        .scroll-mouse::after {
-            content: '';
-            width: 4px;
-            height: 8px;
-            background: var(--accent);
-            border-radius: 2px;
-            position: absolute;
-            top: 6px;
-            left: 50%;
-            transform: translateX(-50%);
-            animation: scrollDot 2s infinite;
-        }
-
-        @keyframes scrollDot {
-            0% {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0)
-            }
-
-            100% {
-                opacity: 0;
-                transform: translateX(-50%) translateY(14px)
-            }
-        }
-
-        .scroll-text {
-            font-size: 0.65rem;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
             font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            border: 1px solid var(--border-h);
+            transition: background 0.3s, border-color 0.3s;
         }
 
-        /* ═══════ CHAPTER SECTIONS ═══════ */
-        .chapter {
-            position: relative;
-            z-index: 1;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            padding: 4rem 1.5rem;
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.2);
         }
 
-        .chapter-inner {
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
+        /* ═══════ DASHBOARD SHOWCASE ═══════ */
+        .dashboard {
+            padding: 2rem 0 6rem;
+        }
+
+        .dash-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
+            grid-template-rows: auto auto;
+            gap: 1rem;
         }
 
-        .chapter.reverse .chapter-inner {
-            direction: rtl;
+        .dash-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s, transform 0.3s;
         }
 
-        .chapter.reverse .chapter-inner>* {
-            direction: ltr;
+        .dash-card:hover {
+            border-color: var(--border-h);
+            transform: translateY(-2px);
         }
 
-        /* ─── Story text ─── */
-        .story-text .chapter-num {
-            font-size: 0.7rem;
-            font-weight: 800;
-            letter-spacing: 0.2em;
+        .dash-card.wide {
+            grid-column: 1 / -1;
+        }
+
+        .dash-card .card-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text3);
+            letter-spacing: 0.15em;
             text-transform: uppercase;
-            color: var(--accent);
-            margin-bottom: 0.75rem;
-            display: block;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.6s ease-out;
+            margin-bottom: 0.5rem;
         }
 
-        .story-text h2 {
-            font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+        .dash-card .card-value {
+            font-size: 2.2rem;
             font-weight: 800;
-            letter-spacing: -0.02em;
-            line-height: 1.15;
-            margin-bottom: 1rem;
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.7s ease-out 0.1s;
+            letter-spacing: -0.03em;
+            margin-bottom: 0.25rem;
         }
 
-        .story-text p {
+        .dash-card .card-change {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .card-change.up {
+            color: var(--accent2);
+        }
+
+        .card-change.down {
+            color: #ef4444;
+        }
+
+        .dash-card .card-desc {
+            font-size: 0.85rem;
             color: var(--text2);
-            font-size: 1.05rem;
             line-height: 1.7;
-            margin-bottom: 1.5rem;
-            opacity: 0;
-            transform: translateY(30px);
-            transition: all 0.7s ease-out 0.2s;
+            margin-top: 0.5rem;
         }
 
-        .chapter.active .story-text .chapter-num,
-        .chapter.active .story-text h2,
-        .chapter.active .story-text p {
-            opacity: 1;
-            transform: translateY(0);
+        /* Glow effect on accent cards */
+        .dash-card.accent-glow::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -30%;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--accent-rgb), 0.08), transparent 70%);
+            pointer-events: none;
         }
 
-        /* ─── Story Visual (phone/card) ─── */
-        .story-visual {
+        /* Mini chart placeholder */
+        .mini-chart {
+            margin-top: 1.5rem;
+            height: 80px;
+            background: linear-gradient(to right,
+                    rgba(var(--accent-rgb), 0.03),
+                    rgba(var(--accent-rgb), 0.08),
+                    rgba(var(--accent-rgb), 0.04));
+            border-radius: var(--radius-sm);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .mini-chart .bar {
+            position: absolute;
+            bottom: 0;
+            width: 8%;
+            border-radius: 4px 4px 0 0;
+            background: linear-gradient(to top, rgba(var(--accent-rgb), 0.3), rgba(var(--accent-rgb), 0.6));
+        }
+
+        /* Chat mockup */
+        .chat-mockup {
+            background: var(--bg2);
+            border-radius: var(--radius-sm);
+            padding: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+        }
+
+        .chat-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.05));
             display: flex;
             align-items: center;
             justify-content: center;
-            opacity: 0;
-            transform: scale(0.85) translateY(40px);
-            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.15s;
+            font-size: 0.9rem;
         }
 
-        .chapter.active .story-visual {
-            opacity: 1;
-            transform: scale(1) translateY(0);
-        }
-
-        /* ─── Phone Mockup ─── */
-        .phone {
-            width: 280px;
-            height: 560px;
-            background: #0f172a;
-            border: 2px solid rgba(255, 255, 255, 0.08);
-            border-radius: 36px;
-            padding: 12px;
-            position: relative;
-            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5),
-                0 0 0 1px rgba(255, 255, 255, 0.03),
-                inset 0 0 30px rgba(255, 255, 255, 0.02);
-        }
-
-        .phone::before {
-            content: '';
-            position: absolute;
-            top: 12px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80px;
-            height: 22px;
-            background: #030712;
-            border-radius: 0 0 14px 14px;
-            z-index: 5;
-        }
-
-        .phone-screen {
-            width: 100%;
-            height: 100%;
-            background: #1e293b;
-            border-radius: 26px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .phone-header {
-            background: rgba(52, 211, 153, 0.1);
-            padding: 2rem 1rem 0.75rem;
-            text-align: center;
-        }
-
-        .phone-header .bot-name {
+        .chat-name {
+            font-weight: 600;
             font-size: 0.85rem;
-            font-weight: 700;
         }
 
-        .phone-header .bot-sub {
-            font-size: 0.6rem;
-            color: var(--text2);
+        .chat-status {
+            font-size: 0.7rem;
+            color: var(--accent2);
         }
 
-        .phone-chat {
-            flex: 1;
-            padding: 0.75rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            overflow: hidden;
-        }
-
-        .chat-bubble {
-            max-width: 85%;
-            padding: 0.6rem 0.8rem;
-            border-radius: 12px;
-            font-size: 0.65rem;
+        .chat-msg {
+            margin-bottom: 0.6rem;
+            max-width: 80%;
+            padding: 0.7rem 1rem;
+            border-radius: 14px;
+            font-size: 0.82rem;
             line-height: 1.5;
             opacity: 0;
-            animation: bubbleIn 0.4s ease-out forwards;
+            animation: msgIn 0.5s ease-out forwards;
         }
 
-        .chat-bubble.bot {
-            background: rgba(52, 211, 153, 0.12);
-            color: var(--accent);
-            align-self: flex-start;
+        .chat-msg.bot {
+            background: var(--card2);
             border-bottom-left-radius: 4px;
         }
 
-        .chat-bubble.user {
-            background: rgba(96, 165, 250, 0.12);
-            color: var(--accent2);
-            align-self: flex-end;
+        .chat-msg.user {
+            background: rgba(var(--accent-rgb), 0.12);
             border-bottom-right-radius: 4px;
+            margin-left: auto;
+            text-align: right;
         }
 
-        .chat-bubble:nth-child(1) {
+        .chat-msg:nth-child(2) {
             animation-delay: 0.3s;
         }
 
-        .chat-bubble:nth-child(2) {
+        .chat-msg:nth-child(3) {
             animation-delay: 0.8s;
         }
 
-        .chat-bubble:nth-child(3) {
+        .chat-msg:nth-child(4) {
             animation-delay: 1.3s;
         }
 
-        .chat-bubble:nth-child(4) {
+        .chat-msg:nth-child(5) {
             animation-delay: 1.8s;
         }
 
-        .chat-bubble:nth-child(5) {
+        .chat-msg:nth-child(6) {
             animation-delay: 2.3s;
         }
 
-        @keyframes bubbleIn {
+        @keyframes msgIn {
             from {
                 opacity: 0;
-                transform: translateY(10px)
+                transform: translateY(10px);
             }
 
             to {
                 opacity: 1;
-                transform: translateY(0)
+                transform: translateY(0);
             }
         }
 
-        /* ─── Visual Cards ─── */
-        .visual-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 2.5rem;
-            max-width: 420px;
-            position: relative;
-            overflow: hidden;
+        /* ═══════ STEPS ═══════ */
+        .steps-section {
+            padding: 6rem 0;
         }
 
-        .visual-card::before {
-            content: '';
-            position: absolute;
-            top: -60px;
-            right: -60px;
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            filter: blur(60px);
-            pointer-events: none;
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
         }
 
-        .visual-card.green::before {
-            background: rgba(52, 211, 153, 0.08);
-        }
-
-        .visual-card.blue::before {
-            background: rgba(96, 165, 250, 0.08);
-        }
-
-        .visual-card.purple::before {
-            background: rgba(167, 139, 250, 0.08);
-        }
-
-        .visual-card.orange::before {
-            background: rgba(251, 146, 60, 0.08);
-        }
-
-        .visual-card .icon {
-            font-size: 3rem;
+        .section-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
             margin-bottom: 1rem;
         }
 
-        .visual-card h3 {
-            font-size: 1.3rem;
+        .section-header h2 {
+            font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.75rem;
+        }
+
+        .section-header p {
+            color: var(--text2);
+            font-size: 1rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .steps-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+        }
+
+        .step-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem 1.5rem;
+            position: relative;
+            transition: border-color 0.3s, transform 0.3s;
+        }
+
+        .step-card:hover {
+            border-color: rgba(var(--accent-rgb), 0.2);
+            transform: translateY(-4px);
+        }
+
+        .step-num {
+            font-size: 3rem;
+            font-weight: 900;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            position: absolute;
+            top: 1rem;
+            right: 1.2rem;
+            line-height: 1;
+        }
+
+        .step-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .step-icon.orange {
+            background: rgba(var(--accent-rgb), 0.12);
+        }
+
+        .step-icon.green {
+            background: rgba(var(--accent2-rgb), 0.12);
+        }
+
+        .step-icon.blue {
+            background: rgba(96, 165, 250, 0.12);
+        }
+
+        .step-icon.purple {
+            background: rgba(168, 85, 247, 0.12);
+        }
+
+        .step-card h3 {
+            font-size: 1rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
         }
 
-        .visual-card p {
+        .step-card p {
+            font-size: 0.82rem;
             color: var(--text2);
-            font-size: 0.9rem;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
-        /* ─── Escrow Flow Diagram ─── */
-        .escrow-flow {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            padding: 1rem 0;
-        }
-
-        .flow-step {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            opacity: 0;
-            transform: translateX(-20px);
-            transition: all 0.5s ease-out;
-        }
-
-        .chapter.active .flow-step:nth-child(1) {
-            opacity: 1;
-            transform: translateX(0);
-            transition-delay: 0.3s;
-        }
-
-        .chapter.active .flow-step:nth-child(2) {
-            opacity: 1;
-            transform: translateX(0);
-            transition-delay: 0.6s;
-        }
-
-        .chapter.active .flow-step:nth-child(3) {
-            opacity: 1;
-            transform: translateX(0);
-            transition-delay: 0.9s;
-        }
-
-        .chapter.active .flow-step:nth-child(4) {
-            opacity: 1;
-            transform: translateX(0);
-            transition-delay: 1.2s;
-        }
-
-        .flow-dot {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-        }
-
-        .flow-dot.g {
-            background: rgba(52, 211, 153, 0.15);
-        }
-
-        .flow-dot.b {
-            background: rgba(96, 165, 250, 0.15);
-        }
-
-        .flow-dot.p {
-            background: rgba(167, 139, 250, 0.15);
-        }
-
-        .flow-dot.o {
-            background: rgba(251, 146, 60, 0.15);
-        }
-
-        .flow-line {
-            width: 2px;
-            height: 20px;
-            background: var(--border);
-            margin-left: 19px;
-            opacity: 0;
-            transition: opacity 0.5s ease-out;
-        }
-
-        .chapter.active .flow-line:nth-of-type(1) {
-            opacity: 1;
-            transition-delay: 0.5s;
-        }
-
-        .chapter.active .flow-line:nth-of-type(2) {
-            opacity: 1;
-            transition-delay: 0.8s;
-        }
-
-        .chapter.active .flow-line:nth-of-type(3) {
-            opacity: 1;
-            transition-delay: 1.1s;
-        }
-
-        .flow-text h4 {
-            font-size: 0.95rem;
-            font-weight: 700;
-        }
-
-        .flow-text p {
-            font-size: 0.8rem;
-            color: var(--text2);
-            margin: 0;
-        }
-
-        /* ═══════ STATS SECTION ═══════ */
-        .stats-section {
-            z-index: 1;
-            position: relative;
-            padding: 4rem 1.5rem;
-        }
-
-        .stats-grid {
-            max-width: 900px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1.5rem;
-        }
-
-        .stat-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2rem;
-            text-align: center;
-            opacity: 0;
-            transform: translateY(40px);
-            transition: all 0.6s ease-out;
-        }
-
-        .stat-card.visible {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .stat-card:nth-child(2).visible {
-            transition-delay: 0.15s;
-        }
-
-        .stat-card:nth-child(3).visible {
-            transition-delay: 0.3s;
-        }
-
-        .stat-value {
-            font-size: clamp(2rem, 4vw, 2.8rem);
-            font-weight: 800;
-            letter-spacing: -0.02em;
-        }
-
-        .stat-label {
-            color: var(--muted);
-            font-size: 0.8rem;
-            font-weight: 500;
-            margin-top: 0.3rem;
-        }
-
-        /* ═══════ FEATURES HIGHLIGHTS ═══════ */
+        /* ═══════ FEATURES BENTO ═══════ */
         .features-section {
-            z-index: 1;
-            position: relative;
-            padding: 6rem 1.5rem;
-            max-width: 1200px;
-            margin: 0 auto;
+            padding: 6rem 0;
         }
 
-        .features-header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
-
-        .features-header .label {
-            font-size: 0.7rem;
-            font-weight: 800;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--accent3);
-            margin-bottom: 0.75rem;
-        }
-
-        .features-header h2 {
-            font-size: clamp(2rem, 4vw, 3rem);
-            font-weight: 800;
-            letter-spacing: -0.02em;
-        }
-
-        .features-bento {
+        .bento-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             grid-template-rows: auto auto;
@@ -811,72 +609,60 @@
         .bento-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 2rem;
-            opacity: 0;
-            transform: translateY(30px) scale(0.97);
-            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            border-radius: var(--radius);
+            padding: 2.5rem 2rem;
             position: relative;
             overflow: hidden;
-        }
-
-        .bento-card.visible {
-            opacity: 1;
-            transform: translateY(0) scale(1);
+            transition: border-color 0.3s, transform 0.3s;
         }
 
         .bento-card:hover {
-            border-color: rgba(255, 255, 255, 0.12);
-            transform: translateY(-4px) !important;
+            border-color: var(--border-h);
+            transform: translateY(-3px);
         }
 
-        .bento-card .bento-icon {
+        .bento-card.span-2 {
+            grid-column: span 2;
+        }
+
+        .bento-card .b-icon {
             width: 48px;
             height: 48px;
             border-radius: 14px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
-            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            margin-bottom: 1.5rem;
+            background: rgba(var(--accent-rgb), 0.08);
         }
 
         .bento-card h3 {
-            font-size: 1.1rem;
+            font-size: 1.15rem;
             font-weight: 700;
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.5rem;
         }
 
         .bento-card p {
+            font-size: 0.85rem;
             color: var(--text2);
-            font-size: 0.9rem;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
-        .bento-wide {
-            grid-column: span 2;
-        }
-
-        .bento-card::after {
-            content: '';
+        .bento-card .glow-corner {
             position: absolute;
-            top: -80px;
-            right: -80px;
+            top: -60px;
+            right: -60px;
             width: 200px;
             height: 200px;
             border-radius: 50%;
-            filter: blur(80px);
+            background: radial-gradient(circle, rgba(var(--accent-rgb), 0.06), transparent 70%);
             pointer-events: none;
-            opacity: 0.5;
         }
 
         /* ═══════ LIVE MARKET ═══════ */
         .market-section {
-            z-index: 1;
-            position: relative;
-            padding: 6rem 1.5rem;
-            max-width: 1200px;
-            margin: 0 auto;
+            padding: 6rem 0;
         }
 
         .market-header {
@@ -885,276 +671,284 @@
             align-items: flex-end;
             flex-wrap: wrap;
             gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .market-header .label {
-            font-size: 0.7rem;
-            font-weight: 800;
-            letter-spacing: 0.2em;
-            text-transform: uppercase;
-            color: var(--accent);
-        }
-
-        .market-header h2 {
-            font-size: clamp(1.8rem, 3vw, 2.5rem);
-            font-weight: 800;
-            letter-spacing: -0.02em;
+            margin-bottom: 2rem;
         }
 
         .market-tabs {
             display: flex;
-            gap: 4px;
-            background: rgba(255, 255, 255, 0.04);
-            border-radius: 12px;
-            padding: 4px;
+            gap: 0.5rem;
         }
 
         .m-tab {
-            padding: 0.5rem 1.3rem;
-            border-radius: 10px;
-            font-size: 0.8rem;
+            padding: 0.5rem 1.2rem;
+            font-size: 0.78rem;
             font-weight: 600;
+            border-radius: 10px;
             cursor: pointer;
             transition: all 0.3s;
-            border: none;
+            border: 1px solid var(--border);
             background: transparent;
-            color: var(--muted);
+            color: var(--text2);
         }
 
         .m-tab.active {
-            background: var(--accent);
-            color: var(--bg);
+            background: rgba(var(--accent-rgb), 0.1);
+            color: var(--accent);
+            border-color: rgba(var(--accent-rgb), 0.2);
         }
 
-        .m-tab:not(.active):hover {
-            color: var(--text);
-        }
-
-        .ads-grid {
+        .ads-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
             gap: 1rem;
-            margin-top: 1rem;
         }
 
         .ad-card {
             background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: var(--radius);
             padding: 1.5rem;
-            transition: border-color 0.3s, transform 0.2s;
+            transition: border-color 0.3s, transform 0.3s;
         }
 
         .ad-card:hover {
-            border-color: rgba(52, 211, 153, 0.2);
+            border-color: var(--border-h);
             transform: translateY(-2px);
         }
 
-        .ad-header {
+        .ad-top {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
+            align-items: baseline;
             margin-bottom: 1rem;
         }
 
         .ad-amount {
-            font-size: 1.4rem;
+            font-size: 1.6rem;
             font-weight: 800;
+            letter-spacing: -0.02em;
         }
 
         .ad-token {
-            font-size: 0.8rem;
-            color: var(--muted);
+            font-size: 0.75rem;
+            color: var(--text3);
             font-weight: 500;
+            margin-left: 0.3rem;
         }
 
         .ad-rate {
-            background: rgba(52, 211, 153, 0.1);
-            color: var(--accent);
-            padding: 0.3rem 0.7rem;
-            border-radius: 100px;
-            font-size: 0.75rem;
+            font-size: 1.1rem;
             font-weight: 700;
+            color: var(--accent);
         }
 
         .ad-trader {
             display: flex;
             align-items: center;
-            gap: 0.7rem;
-            margin-bottom: 1rem;
+            gap: 0.6rem;
+            margin-bottom: 1.2rem;
         }
 
         .ad-avatar {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.06);
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: rgba(var(--accent-rgb), 0.1);
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 0.7rem;
             font-weight: 700;
-            color: var(--muted);
+            color: var(--accent);
         }
 
         .ad-name {
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 600;
         }
 
-        .ad-stats {
-            font-size: 0.7rem;
-            color: var(--muted);
+        .ad-meta {
+            font-size: 0.72rem;
+            color: var(--text3);
         }
 
         .ad-btn {
             display: block;
             width: 100%;
             text-align: center;
-            padding: 0.7rem;
-            border-radius: 12px;
+            padding: 0.65rem;
             font-weight: 700;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.2s;
+            border-radius: 10px;
+            transition: all 0.3s;
         }
 
         .ad-btn.buy {
-            background: linear-gradient(135deg, var(--accent), #2dd4bf);
-            color: var(--bg);
+            background: rgba(var(--accent2-rgb), 0.1);
+            color: var(--accent2);
+            border: 1px solid rgba(var(--accent2-rgb), 0.15);
         }
 
         .ad-btn.sell {
-            background: linear-gradient(135deg, var(--accent2), var(--accent3));
-            color: white;
+            background: rgba(var(--accent-rgb), 0.1);
+            color: var(--accent);
+            border: 1px solid rgba(var(--accent-rgb), 0.15);
         }
 
         .ad-btn:hover {
             transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(52, 211, 153, 0.15);
         }
 
         .no-ads {
             text-align: center;
-            color: var(--muted);
+            color: var(--text3);
             padding: 3rem 1rem;
+            font-size: 0.85rem;
         }
 
         /* ═══════ CTA ═══════ */
-        .cta {
+        .cta-section {
+            padding: 8rem 0;
             text-align: center;
-            padding: 8rem 1.5rem;
             position: relative;
-            z-index: 1;
         }
 
-        .cta-orb {
+        .cta-section::before {
+            content: '';
             position: absolute;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(52, 211, 153, 0.08), transparent 70%);
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+            width: 600px;
+            height: 400px;
+            background: radial-gradient(ellipse, rgba(var(--accent-rgb), 0.06), transparent 70%);
             pointer-events: none;
-            animation: float 10s ease-in-out infinite;
         }
 
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: translate(-50%, -50%) scale(1)
-            }
-
-            50% {
-                transform: translate(-50%, -50%) scale(1.1)
-            }
-        }
-
-        .cta h2 {
+        .cta-section h2 {
             font-size: clamp(2rem, 4vw, 3rem);
             font-weight: 800;
             letter-spacing: -0.02em;
             margin-bottom: 1rem;
-            position: relative;
         }
 
-        .cta p {
+        .cta-section p {
             color: var(--text2);
-            font-size: 1.1rem;
-            margin-bottom: 2.5rem;
-            position: relative;
+            font-size: 1rem;
+            margin-bottom: 2rem;
         }
 
         /* ═══════ FOOTER ═══════ */
         footer {
             border-top: 1px solid var(--border);
-            padding: 2rem 1.5rem;
-            text-align: center;
-            color: var(--muted);
-            font-size: 0.8rem;
-            position: relative;
-            z-index: 1;
+            padding: 2rem 0;
+        }
+
+        .footer-inner {
+            max-width: 1300px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        footer p {
+            color: var(--text3);
+            font-size: 0.75rem;
         }
 
         footer a {
-            color: var(--accent);
+            color: var(--text2);
             text-decoration: none;
+            transition: color 0.3s;
         }
 
-        /* ═══════ SECTION DIVIDERS (gradient glows) ═══════ */
-        .section-glow {
-            height: 1px;
-            max-width: 800px;
-            margin: 0 auto;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            opacity: 0.2;
-            position: relative;
-            z-index: 1;
+        footer a:hover {
+            color: var(--accent);
+        }
+
+        /* ═══════ REVEAL ═══════ */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+        }
+
+        .reveal.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-d1 {
+            transition-delay: 0.1s;
+        }
+
+        .reveal-d2 {
+            transition-delay: 0.2s;
+        }
+
+        .reveal-d3 {
+            transition-delay: 0.3s;
+        }
+
+        .reveal-d4 {
+            transition-delay: 0.4s;
         }
 
         /* ═══════ RESPONSIVE ═══════ */
-        @media (max-width: 900px) {
-            .chapter-inner {
-                grid-template-columns: 1fr !important;
-                gap: 2rem;
+        @media (max-width: 1024px) {
+            .steps-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
 
-            .chapter.reverse .chapter-inner {
-                direction: ltr;
+            .bento-grid {
+                grid-template-columns: 1fr 1fr;
             }
 
-            .story-visual {
-                order: -1;
+            .bento-card.span-2 {
+                grid-column: span 1;
             }
+        }
 
-            .phone {
-                width: 220px;
-                height: 440px;
+        @media (max-width: 768px) {
+            nav {
+                padding: 0.8rem 1rem;
             }
 
             .nav-links a:not(.nav-cta) {
                 display: none;
             }
 
-            .stats-grid {
-                grid-template-columns: 1fr;
-                max-width: 400px;
+            .container {
+                padding: 0 1rem;
             }
 
-            .features-bento {
+            .hero {
+                padding: 3rem 0 2rem;
+            }
+
+            .dash-grid {
                 grid-template-columns: 1fr;
             }
 
-            .bento-wide {
-                grid-column: span 1;
+            .steps-grid {
+                grid-template-columns: 1fr;
             }
 
-            .ads-grid {
+            .bento-grid {
                 grid-template-columns: 1fr;
+            }
+
+            .ads-list {
+                grid-template-columns: 1fr;
+            }
+
+            .partner-logos {
+                gap: 1.5rem;
             }
 
             .market-header {
@@ -1167,448 +961,243 @@
 
 <body>
 
-    <!-- Scroll Progress -->
-    <div class="progress-bar" id="progressBar"></div>
-
-    <!-- Particles -->
-    <canvas id="particles"></canvas>
-
     <!-- ═══ NAV ═══ -->
-    <nav id="navbar">
+    <nav>
         <div class="nav-inner">
-            <div class="logo">🌴 <span>P2P Kerala</span></div>
+            <a href="/" class="nav-brand">🌴 P2P <span>Kerala</span></a>
             <div class="nav-links">
-                <a href="#chapter1">Story</a>
+                <a href="#how">How It Works</a>
                 <a href="#features">Features</a>
                 <a href="#market">Market</a>
-                <a href="https://t.me/P2PKerala_basebot" class="nav-cta" target="_blank">Open Bot →</a>
+                <a href="https://t.me/P2PKerala_basebot" target="_blank" class="nav-cta">Book a Demo</a>
             </div>
         </div>
     </nav>
 
+    <!-- ═══ PARTNER BAR ═══ -->
+    <div class="container">
+        <div class="partner-bar">
+            <p>Join 4,000+ traders already growing</p>
+            <div class="partner-logos">
+                <span><span class="dot">⚡</span> Base</span>
+                <span><span class="dot">🔷</span> USDC</span>
+                <span><span class="dot">📱</span> Telegram</span>
+                <span><span class="dot">🤖</span> AI Vision</span>
+                <span><span class="dot">🔒</span> Escrow</span>
+                <span><span class="dot">💎</span> On-Chain</span>
+            </div>
+        </div>
+    </div>
+
     <!-- ═══ HERO ═══ -->
-    <div class="hero" id="hero">
-        <div class="hero-badge">
-            <div class="pulse-dot"></div> Live on Base Network
+    <section class="hero container">
+        <div class="hero-tag">
+            <div class="pulse"></div> Live on Base Network
         </div>
-        <h1>Trade Crypto<br><span class="gradient-text">Like Sending a Text</span></h1>
-        <p>Kerala's first AI-powered P2P marketplace on Telegram. Smart contract escrow. No KYC. Just chat and trade.
-        </p>
-        <div class="hero-cta">
-            <a href="https://t.me/P2PKerala_basebot" class="btn-glow" target="_blank">✈️ Start Trading</a>
-            <a href="#chapter1" class="btn-ghost">Explore the Story ↓</a>
+        <h1>The Smartest Way to<br><span class="glow">Trade Crypto in Kerala</span></h1>
+        <p>AI-powered P2P marketplace on Telegram. Smart contract escrow. No KYC. Just chat and trade.</p>
+        <div class="hero-btns">
+            <a href="https://t.me/P2PKerala_basebot" target="_blank" class="btn-primary">🚀 Start Trading</a>
+            <a href="#how" class="btn-secondary">See How It Works ↓</a>
         </div>
-        <div class="scroll-indicator">
-            <div class="scroll-mouse"></div>
-            <div class="scroll-text">Scroll to explore</div>
-        </div>
-    </div>
+    </section>
 
-    <!-- ═══ STATS ═══ -->
-    <div class="stats-section">
-        <div class="stats-grid">
-            <div class="stat-card" id="sc1">
-                <div class="stat-value" id="stat-users" style="color:var(--accent)">—</div>
-                <div class="stat-label">Active Traders</div>
+    <!-- ═══ DASHBOARD SHOWCASE ═══ -->
+    <section class="dashboard container">
+        <div class="dash-grid">
+            <!-- Balance Card -->
+            <div class="dash-card accent-glow reveal">
+                <div class="card-label">Platform Volume</div>
+                <div class="card-value" id="stat-volume">$—</div>
+                <div class="card-change up">↑ Growing daily</div>
+                <div class="mini-chart" id="chart1"></div>
             </div>
-            <div class="stat-card" id="sc2">
-                <div class="stat-value" id="stat-volume" style="color:var(--accent2)">—</div>
-                <div class="stat-label">Total Volume</div>
-            </div>
-            <div class="stat-card" id="sc3">
-                <div class="stat-value" id="stat-ads" style="color:var(--accent3)">—</div>
-                <div class="stat-label">Live Ads</div>
-            </div>
-        </div>
-    </div>
 
-    <div class="section-glow"></div>
-
-    <!-- ═══ CHAPTER 1: Open the Bot ═══ -->
-    <div class="chapter" id="chapter1">
-        <div class="chapter-inner">
-            <div class="story-text">
-                <span class="chapter-num">Chapter 1</span>
-                <h2>Open Telegram.<br>That's It.</h2>
-                <p>No app downloads. No KYC forms. No waiting periods. Just search <strong>@P2PKerala_basebot</strong>,
-                    hit <strong>/start</strong>, and your secure wallet is created in seconds.</p>
-                <p>Your keys, your crypto. We never touch your funds.</p>
+            <!-- Users Card -->
+            <div class="dash-card accent-glow reveal reveal-d1">
+                <div class="card-label">Active Traders</div>
+                <div class="card-value" id="stat-users">—</div>
+                <div class="card-change up">Verified & trusted</div>
+                <div class="mini-chart" id="chart2"></div>
             </div>
-            <div class="story-visual">
-                <div class="phone">
-                    <div class="phone-screen">
-                        <div class="phone-header">
-                            <div class="bot-name">🌴 P2P Kerala</div>
-                            <div class="bot-sub">bot · online</div>
-                        </div>
-                        <div class="phone-chat">
-                            <div class="chat-bubble bot">🎉 Welcome to P2P Kerala!<br>Your wallet is ready.</div>
-                            <div class="chat-bubble bot">💰 Balance: 0.00 USDC<br>📱 UPI: Not set</div>
-                            <div class="chat-bubble user">/ads</div>
-                            <div class="chat-bubble bot">📢 Live Market<br>──────────<br>🟢 1.00 USDC @ ₹98<br>🟢 5.00
-                                USDC @ ₹97</div>
-                            <div class="chat-bubble user">buy 1 usdc</div>
+
+            <!-- Wide Chat Mockup Card -->
+            <div class="dash-card wide reveal reveal-d2">
+                <div class="card-label">💬 Live Trading Interface</div>
+                <div class="chat-mockup">
+                    <div class="chat-header">
+                        <div class="chat-avatar">🌴</div>
+                        <div>
+                            <div class="chat-name">P2P Kerala Bot</div>
+                            <div class="chat-status">● online</div>
                         </div>
                     </div>
+                    <div class="chat-msg bot">👋 Welcome to P2P Kerala! Your wallet is ready. Balance: 0.00 USDC</div>
+                    <div class="chat-msg user">buy 10 usdc at 95</div>
+                    <div class="chat-msg bot">✅ Buy order created! 10 USDC @ ₹95/USDC. Waiting for a seller...</div>
+                    <div class="chat-msg bot">🔔 Trade matched! Seller @trader1 has locked 10 USDC in escrow.</div>
+                    <div class="chat-msg user">📸 [Payment screenshot sent]</div>
+                    <div class="chat-msg bot">🤖 AI verified your payment! ✅ 10 USDC released to your wallet. Trade
+                        complete!</div>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- ═══ CHAPTER 2: Find a Trade ═══ -->
-    <div class="chapter reverse" id="chapter2">
-        <div class="chapter-inner">
-            <div class="story-text">
-                <span class="chapter-num">Chapter 2</span>
-                <h2>Find a Trade.<br>Or Create One.</h2>
-                <p>Browse live buy/sell ads from trusted traders with verified trust scores. Or create your own ad —
-                    just type naturally:</p>
-                <p><em>"sell 100 usdc at 88"</em> — the AI handles the rest. No confusing menus, no forms.</p>
+    <!-- ═══ HOW IT WORKS ═══ -->
+    <section class="steps-section container" id="how">
+        <div class="section-header reveal">
+            <div class="section-tag">⚡ How It Works</div>
+            <h2>Four Steps. Under 5 Minutes.</h2>
+            <p>From zero to crypto — simple as sending a message.</p>
+        </div>
+        <div class="steps-grid">
+            <div class="step-card reveal">
+                <div class="step-num">01</div>
+                <div class="step-icon orange">💬</div>
+                <h3>Open Telegram</h3>
+                <p>Search @P2PKerala_basebot, type /start. Wallet created in seconds. No downloads, no KYC.</p>
             </div>
-            <div class="story-visual">
-                <div class="visual-card blue">
-                    <div class="icon">📢</div>
-                    <h3>Live Ads Board</h3>
-                    <p>Real-time buy and sell orders from verified traders across Kerala. Tap to trade instantly.</p>
-                    <div style="margin-top:1.5rem;display:flex;flex-direction:column;gap:0.6rem">
-                        <div
-                            style="display:flex;justify-content:space-between;align-items:center;background:rgba(96,165,250,0.06);padding:0.6rem 0.8rem;border-radius:10px;font-size:0.8rem">
-                            <span>🟢 @trader1 · 5 USDC</span>
-                            <span style="color:var(--accent);font-weight:700">₹97</span>
-                        </div>
-                        <div
-                            style="display:flex;justify-content:space-between;align-items:center;background:rgba(96,165,250,0.06);padding:0.6rem 0.8rem;border-radius:10px;font-size:0.8rem">
-                            <span>🟢 @seller2 · 10 USDC</span>
-                            <span style="color:var(--accent);font-weight:700">₹96</span>
-                        </div>
-                        <div
-                            style="display:flex;justify-content:space-between;align-items:center;background:rgba(96,165,250,0.06);padding:0.6rem 0.8rem;border-radius:10px;font-size:0.8rem">
-                            <span>🔴 @buyer3 · 20 USDC</span>
-                            <span style="color:var(--accent2);font-weight:700">₹95</span>
-                        </div>
-                    </div>
-                </div>
+            <div class="step-card reveal reveal-d1">
+                <div class="step-num">02</div>
+                <div class="step-icon green">📢</div>
+                <h3>Find a Trade</h3>
+                <p>Browse live ads or just type "sell 50 usdc at 90". The AI understands natural language.</p>
+            </div>
+            <div class="step-card reveal reveal-d2">
+                <div class="step-num">03</div>
+                <div class="step-icon blue">🔒</div>
+                <h3>Escrow Locks</h3>
+                <p>Crypto locked in a smart contract vault. Nobody can touch it until both parties confirm.</p>
+            </div>
+            <div class="step-card reveal reveal-d3">
+                <div class="step-num">04</div>
+                <div class="step-icon purple">✅</div>
+                <h3>Trade Complete</h3>
+                <p>AI verifies payment. Funds released instantly. Settled on Base — fast, cheap, permanent.</p>
             </div>
         </div>
-    </div>
+    </section>
 
-    <!-- ═══ CHAPTER 3: Escrow ═══ -->
-    <div class="chapter" id="chapter3">
-        <div class="chapter-inner">
-            <div class="story-text">
-                <span class="chapter-num">Chapter 3</span>
-                <h2>Your Money is<br>Locked in a Vault.</h2>
-                <p>The moment a trade starts, the seller's USDC is locked in a <strong>smart contract on Base</strong>.
-                    Nobody can touch it — not even us.</p>
-                <p>It's like putting your money in a vault that only unlocks when both sides agree.</p>
-            </div>
-            <div class="story-visual">
-                <div class="visual-card green" style="padding:2rem">
-                    <div class="escrow-flow">
-                        <div class="flow-step">
-                            <div class="flow-dot g">🔒</div>
-                            <div class="flow-text">
-                                <h4>Seller Deposits USDC</h4>
-                                <p>Crypto locked in smart contract</p>
-                            </div>
-                        </div>
-                        <div class="flow-line"></div>
-                        <div class="flow-step">
-                            <div class="flow-dot b">💸</div>
-                            <div class="flow-text">
-                                <h4>Buyer Pays via UPI</h4>
-                                <p>Sends INR directly to seller's bank</p>
-                            </div>
-                        </div>
-                        <div class="flow-line"></div>
-                        <div class="flow-step">
-                            <div class="flow-dot p">🤖</div>
-                            <div class="flow-text">
-                                <h4>AI Verifies Payment</h4>
-                                <p>Screenshot analyzed in seconds</p>
-                            </div>
-                        </div>
-                        <div class="flow-line"></div>
-                        <div class="flow-step">
-                            <div class="flow-dot o">✅</div>
-                            <div class="flow-text">
-                                <h4>Crypto Released</h4>
-                                <p>Automatically sent to buyer's wallet</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ═══ CHAPTER 4: Complete ═══ -->
-    <div class="chapter reverse" id="chapter4">
-        <div class="chapter-inner">
-            <div class="story-text">
-                <span class="chapter-num">Chapter 4</span>
-                <h2>Done.<br>In Under 5 Minutes.</h2>
-                <p>Buyer gets their USDC. Seller gets their INR. Both traders earn trust points. The smart contract
-                    settles everything on-chain — transparent, permanent, immutable.</p>
-                <p>No middlemen. No delays. Just peer-to-peer freedom. 🎉</p>
-            </div>
-            <div class="story-visual">
-                <div class="visual-card purple">
-                    <div class="icon">🏆</div>
-                    <h3>Trade Complete!</h3>
-                    <div
-                        style="margin:1rem 0;padding:1.2rem;background:rgba(167,139,250,0.06);border-radius:14px;font-size:0.85rem;line-height:2">
-                        <div style="display:flex;justify-content:space-between"><span
-                                style="color:var(--text2)">Amount</span><span style="font-weight:700">1.00 USDC</span>
-                        </div>
-                        <div style="display:flex;justify-content:space-between"><span
-                                style="color:var(--text2)">Paid</span><span style="font-weight:700">₹98.00</span></div>
-                        <div style="display:flex;justify-content:space-between"><span
-                                style="color:var(--text2)">Fee</span><span style="font-weight:700">0.005 USDC</span>
-                        </div>
-                        <div
-                            style="display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.5rem">
-                            <span style="color:var(--text2)">Status</span><span
-                                style="color:var(--accent);font-weight:700">✅ Completed</span></div>
-                    </div>
-                    <p style="font-size:0.8rem;color:var(--muted);text-align:center;margin:0">Settled on Base · Block
-                        #18,492,031</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="section-glow"></div>
-
-    <!-- ═══ FEATURES ═══ -->
-    <div class="features-section" id="features">
-        <div class="features-header">
-            <div class="label">Superpowers</div>
+    <!-- ═══ FEATURES BENTO ═══ -->
+    <section class="features-section container" id="features">
+        <div class="section-header reveal">
+            <div class="section-tag">🛡️ Superpowers</div>
             <h2>Built Different.</h2>
+            <p>Every detail engineered for safety and speed.</p>
         </div>
-        <div class="features-bento">
-            <div class="bento-card bento-wide" id="b1" style="--delay:0s">
-                <div class="bento-icon" style="background:rgba(52,211,153,0.1)">🛡️</div>
+        <div class="bento-grid">
+            <div class="bento-card span-2 reveal">
+                <div class="glow-corner"></div>
+                <div class="b-icon">🛡️</div>
                 <h3>Smart Contract Escrow</h3>
-                <p>Funds are locked on-chain until both parties confirm. Trustless, transparent, tamper-proof. Neither
-                    party — not even us — can access locked funds.</p>
+                <p>Funds are locked on-chain until both parties confirm. No middlemen, no trust required. Built on Base
+                    L2 with near-zero gas fees — transactions settle in seconds, not hours.</p>
             </div>
-            <div class="bento-card" id="b2" style="--delay:0.1s">
-                <div class="bento-icon" style="background:rgba(96,165,250,0.1)">🤖</div>
+            <div class="bento-card reveal reveal-d1">
+                <div class="b-icon">🤖</div>
                 <h3>AI Vision</h3>
-                <p>Send a payment screenshot and our AI verifies it instantly.</p>
+                <p>Send a payment screenshot — our AI analyzes and verifies it in real-time. No more "did you pay?"
+                    disputes.</p>
             </div>
-            <div class="bento-card" id="b3" style="--delay:0.2s">
-                <div class="bento-icon" style="background:rgba(167,139,250,0.1)">⚡</div>
-                <h3>Base L2</h3>
-                <p>Near-zero gas fees. Transactions confirm in seconds.</p>
+            <div class="bento-card reveal reveal-d2">
+                <div class="b-icon">💬</div>
+                <h3>Natural Language</h3>
+                <p>Just chat. "Buy 10 usdc at 95" — the AI understands you like a real person. No confusing menus.</p>
             </div>
-            <div class="bento-card bento-wide" id="b4" style="--delay:0.3s">
-                <div class="bento-icon" style="background:rgba(251,146,60,0.1)">💬</div>
-                <h3>Natural Language Trading</h3>
-                <p>Just type "sell 50 usdc at 90" and the AI handles the rest. No menus, no forms — just conversation.
-                    The bot understands you like a real person.</p>
-            </div>
-            <div class="bento-card" id="b5" style="--delay:0.4s">
-                <div class="bento-icon" style="background:rgba(236,72,153,0.1)">⏰</div>
+            <div class="bento-card reveal reveal-d3">
+                <div class="b-icon">⏰</div>
                 <h3>Auto-Refund</h3>
-                <p>If buyer doesn't pay, crypto is refunded automatically.</p>
+                <p>If buyer doesn't pay, crypto is automatically returned. Your funds are never stuck.</p>
+            </div>
+            <div class="bento-card reveal reveal-d4">
+                <div class="b-icon">⭐</div>
+                <h3>Trust System</h3>
+                <p>Every completed trade earns trust points. Higher score = more visibility and better matches.</p>
             </div>
         </div>
-    </div>
+    </section>
 
-    <div class="section-glow"></div>
-
-    <!-- ═══ LIVE MARKET ═══ -->
-    <div class="market-section" id="market">
-        <div class="market-header">
+    <!-- ═══ MARKET ═══ -->
+    <section class="market-section container" id="market">
+        <div class="market-header reveal">
             <div>
-                <div class="label">Live Market</div>
-                <h2>Real-Time Ads</h2>
+                <div class="section-tag">📊 Live Market</div>
+                <h2 style="font-size:clamp(1.5rem,3vw,2rem);font-weight:800;letter-spacing:-0.02em">Real-Time Ads</h2>
             </div>
             <div class="market-tabs">
                 <button class="m-tab active" id="tab-sell" onclick="switchTab('sell')">Buy Crypto</button>
                 <button class="m-tab" id="tab-buy" onclick="switchTab('buy')">Sell Crypto</button>
             </div>
         </div>
-        <div id="ads-container" class="ads-grid"></div>
+        <div id="ads-container" class="ads-list"></div>
         <p id="no-ads-msg" class="no-ads" style="display:none">No active orders right now.</p>
-    </div>
+    </section>
 
     <!-- ═══ CTA ═══ -->
-    <div class="cta" id="cta-section">
-        <div class="cta-orb"></div>
-        <h2>Ready to Trade?</h2>
-        <p>Join Kerala's most secure P2P crypto platform.</p>
-        <a href="https://t.me/P2PKerala_basebot" class="btn-glow" target="_blank" style="position:relative">✈️ Open on
-            Telegram</a>
-    </div>
+    <section class="cta-section container reveal">
+        <h2>Ready to Start Trading?</h2>
+        <p>Join Kerala's most trusted P2P crypto platform.</p>
+        <a href="https://t.me/P2PKerala_basebot" target="_blank" class="btn-primary">Open on Telegram →</a>
+    </section>
 
+    <!-- ═══ FOOTER ═══ -->
     <footer>
-        <p>© 2025 P2P Kerala · Built on <a href="https://base.org" target="_blank">Base</a> · 0.5% Trading Fee</p>
+        <div class="footer-inner">
+            <p>© 2025 P2P Kerala · Built on <a href="https://base.org" target="_blank">Base</a></p>
+            <p>0.5% Fee · <a href="https://t.me/P2PKerala_basebot" target="_blank">@P2PKerala_basebot</a></p>
+        </div>
     </footer>
 
     <script>
-        /* ═══════════════════════════════════════════
-           PARTICLE BACKGROUND
-           ═══════════════════════════════════════════ */
-        const canvas = document.getElementById('particles');
-        const ctx = canvas.getContext('2d');
-        let particles = [];
-        let mouse = { x: null, y: null };
+        /* ═══ REVEAL ON SCROLL ═══ */
+        const obs = new IntersectionObserver(entries => {
+            entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+        }, { threshold: 0.1 });
+        document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
 
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-
-        class Particle {
-            constructor() { this.reset(); }
-            reset() {
-                this.x = Math.random() * canvas.width;
-                this.y = Math.random() * canvas.height;
-                this.size = Math.random() * 2 + 0.5;
-                this.speedX = (Math.random() - 0.5) * 0.3;
-                this.speedY = (Math.random() - 0.5) * 0.3;
-                this.opacity = Math.random() * 0.4 + 0.1;
-            }
-            update() {
-                this.x += this.speedX;
-                this.y += this.speedY;
-                // Mouse interaction
-                if (mouse.x !== null) {
-                    const dx = mouse.x - this.x, dy = mouse.y - this.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 150) {
-                        this.x -= dx * 0.01;
-                        this.y -= dy * 0.01;
-                        this.opacity = Math.min(0.8, this.opacity + 0.02);
-                    }
-                }
-                if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) this.reset();
-            }
-            draw() {
-                ctx.fillStyle = `rgba(52, 211, 153, ${this.opacity})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
+        /* ═══ MINI CHART BARS ═══ */
+        function createBars(id) {
+            const chart = document.getElementById(id);
+            if (!chart) return;
+            const count = 12;
+            for (let i = 0; i < count; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'bar';
+                const h = 20 + Math.random() * 70;
+                bar.style.height = h + '%';
+                bar.style.left = (i * (100 / count) + 1) + '%';
+                bar.style.animationDelay = (i * 0.05) + 's';
+                chart.appendChild(bar);
             }
         }
+        createBars('chart1');
+        createBars('chart2');
 
-        for (let i = 0; i < 80; i++) particles.push(new Particle());
-
-        function drawLines() {
-            for (let i = 0; i < particles.length; i++) {
-                for (let j = i + 1; j < particles.length; j++) {
-                    const dx = particles[i].x - particles[j].x;
-                    const dy = particles[i].y - particles[j].y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < 120) {
-                        ctx.strokeStyle = `rgba(52, 211, 153, ${0.05 * (1 - dist / 120)})`;
-                        ctx.lineWidth = 0.5;
-                        ctx.beginPath();
-                        ctx.moveTo(particles[i].x, particles[i].y);
-                        ctx.lineTo(particles[j].x, particles[j].y);
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
-
-        function animateParticles() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            particles.forEach(p => { p.update(); p.draw(); });
-            drawLines();
-            requestAnimationFrame(animateParticles);
-        }
-        animateParticles();
-
-        /* ═══════════════════════════════════════════
-           SCROLL PROGRESS BAR
-           ═══════════════════════════════════════════ */
-        window.addEventListener('scroll', () => {
-            const scrollTop = window.scrollY;
-            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-            const progress = (scrollTop / docHeight) * 100;
-            document.getElementById('progressBar').style.width = progress + '%';
-
-            // Nav background
-            document.getElementById('navbar').classList.toggle('scrolled', scrollTop > 60);
-
-            // Parallax hero
-            const hero = document.getElementById('hero');
-            if (hero) {
-                hero.style.transform = `translateY(${scrollTop * 0.3}px)`;
-                hero.style.opacity = 1 - scrollTop / 600;
-            }
-        });
-
-        /* ═══════════════════════════════════════════
-           CHAPTER SCROLL ANIMATIONS (IntersectionObserver)
-           ═══════════════════════════════════════════ */
-        const chapterObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('active');
-                }
-            });
-        }, { threshold: 0.2, rootMargin: '0px 0px -80px 0px' });
-
-        document.querySelectorAll('.chapter').forEach(ch => chapterObserver.observe(ch));
-
-        // Stats cards
-        const statObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) entry.target.classList.add('visible');
-            });
-        }, { threshold: 0.3 });
-        document.querySelectorAll('.stat-card').forEach(c => statObserver.observe(c));
-
-        // Bento cards
-        const bentoObserver = new IntersectionObserver((entries) => {
-            entries.forEach((entry, i) => {
-                if (entry.isIntersecting) {
-                    setTimeout(() => entry.target.classList.add('visible'), i * 100);
-                }
-            });
-        }, { threshold: 0.15 });
-        document.querySelectorAll('.bento-card').forEach(c => bentoObserver.observe(c));
-
-        /* ═══════════════════════════════════════════
-           ANIMATED COUNTER
-           ═══════════════════════════════════════════ */
-        function animateValue(el, end, prefix = '', suffix = '') {
+        /* ═══ COUNTERS ═══ */
+        function animateVal(el, end, prefix = '', suffix = '') {
             if (!el || end === 0) { if (el) el.textContent = prefix + '0' + suffix; return; }
-            const duration = 1800;
-            const startTime = performance.now();
+            const dur = 2000, start = performance.now();
             function tick(now) {
-                const elapsed = now - startTime;
-                const progress = Math.min(elapsed / duration, 1);
-                const eased = 1 - Math.pow(1 - progress, 3);
-                el.textContent = prefix + Math.round(end * eased).toLocaleString() + suffix;
-                if (progress < 1) requestAnimationFrame(tick);
+                const t = Math.min((now - start) / dur, 1);
+                const v = 1 - Math.pow(1 - t, 3);
+                el.textContent = prefix + Math.round(end * v).toLocaleString() + suffix;
+                if (t < 1) requestAnimationFrame(tick);
             }
             requestAnimationFrame(tick);
         }
 
-        /* ═══════════════════════════════════════════
-           DATA FETCHING
-           ═══════════════════════════════════════════ */
         async function fetchStats() {
             try {
-                const res = await fetch('/api/stats');
-                const data = await res.json();
-                animateValue(document.getElementById('stat-users'), data.total_users || 0);
-                animateValue(document.getElementById('stat-volume'), data.total_volume_usdc || 0, '$');
-                animateValue(document.getElementById('stat-ads'), data.active_orders || 0);
-            } catch (e) { console.error("Stats fetch failed", e); }
+                const r = await fetch('/api/stats');
+                const d = await r.json();
+                animateVal(document.getElementById('stat-users'), d.total_users || 0);
+                animateVal(document.getElementById('stat-volume'), d.total_volume_usdc || 0, '$');
+            } catch (e) { console.log('Stats API unavailable'); }
         }
 
-        let currentAds = { sell: [], buy: [] };
-        let activeTab = 'sell';
+        /* ═══ MARKET ADS ═══ */
+        let currentAds = { sell: [], buy: [] }, activeTab = 'sell';
 
         function switchTab(tab) {
             activeTab = tab;
@@ -1619,35 +1208,30 @@
 
         async function fetchAds() {
             try {
-                const res = await fetch('/api/ads');
-                currentAds = await res.json();
+                const r = await fetch('/api/ads');
+                currentAds = await r.json();
                 renderAds();
-            } catch (e) { console.error("Ads fetch failed", e); }
+            } catch (e) { console.log('Ads API unavailable'); }
         }
 
         function renderAds() {
-            const container = document.getElementById('ads-container');
-            const noMsg = document.getElementById('no-ads-msg');
+            const c = document.getElementById('ads-container');
+            const n = document.getElementById('no-ads-msg');
             const ads = currentAds[activeTab] || [];
-            if (ads.length === 0) {
-                container.innerHTML = '';
-                noMsg.style.display = 'block';
-                noMsg.textContent = activeTab === 'sell' ? "No one is selling right now." : "No one is buying right now.";
-                return;
-            }
-            noMsg.style.display = 'none';
+            if (!ads.length) { c.innerHTML = ''; n.style.display = 'block'; return; }
+            n.style.display = 'none';
             const isSell = activeTab === 'sell';
-            container.innerHTML = ads.map(ad => `
+            c.innerHTML = ads.map(ad => `
         <div class="ad-card">
-            <div class="ad-header">
-                <div><div class="ad-amount">${ad.amount} <span class="ad-token">${ad.token}</span></div></div>
+            <div class="ad-top">
+                <div><span class="ad-amount">${ad.amount}</span><span class="ad-token">${ad.token}</span></div>
                 <div class="ad-rate">₹${ad.rate}</div>
             </div>
             <div class="ad-trader">
                 <div class="ad-avatar">${ad.seller?.username?.[0]?.toUpperCase() || 'U'}</div>
                 <div>
                     <div class="ad-name">@${ad.seller?.username || 'anon'}</div>
-                    <div class="ad-stats">⭐ ${ad.seller?.trust_score || 0}% · ${ad.seller?.completed_trades || 0} trades</div>
+                    <div class="ad-meta">⭐ ${ad.seller?.trust_score || 0}% · ${ad.seller?.completed_trades || 0} trades</div>
                 </div>
             </div>
             <a href="https://t.me/P2PKerala_basebot?start=${isSell ? 'buy' : 'sell'}_${ad.id}" target="_blank" class="ad-btn ${isSell ? 'buy' : 'sell'}">
@@ -1657,8 +1241,7 @@
     `).join('');
         }
 
-        fetchStats();
-        fetchAds();
+        fetchStats(); fetchAds();
         setInterval(() => { fetchStats(); fetchAds(); }, 30000);
     </script>
 </body>
