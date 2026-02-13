@@ -1077,6 +1077,10 @@ bot.command("disputes", async (ctx) => {
 
 bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery.data;
+    console.log(`[CALLBACK] Received: ${data} from user ${ctx.from.id} (@${ctx.from.username || "anon"})`);
+
+    // Ensure all callbacks are answered eventually (default fallback if not handled)
+    let handled = false;
 
     // ─────── AD CREATION HANDLERS ───────
 
@@ -1131,6 +1135,7 @@ bot.on("callback_query:data", async (ctx) => {
             { parse_mode: "Markdown" }
         );
         await ctx.answerCallbackQuery();
+        handled = true;
     }
 
     // Handle AI-generated Sell Order confirmation
@@ -2716,8 +2721,11 @@ bot.on("message:text", async (ctx) => {
             case "CREATE_SELL_ORDER":
                 if (intent.params.amount && intent.params.rate) {
                     // We have enough info to create the order
+                    const callbackData = `create_sell:${intent.params.amount}:${intent.params.rate}`;
+                    console.log(`DEBUG: Creating SELL button with data: ${callbackData}`);
+
                     const keyboard = new InlineKeyboard()
-                        .text("✅ Confirm Order", `create_sell:${intent.params.amount}:${intent.params.rate}`)
+                        .text("✅ Confirm Order", callbackData)
                         .text("❌ Cancel", "cancel_action");
 
                     const feeAmt = intent.params.amount * env.FEE_PERCENTAGE;
