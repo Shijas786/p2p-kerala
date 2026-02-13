@@ -1426,7 +1426,8 @@ bot.on("callback_query:data", async (ctx) => {
                     `Buyer receives: ${formatUSDC(buyerReceives, order.token)}`,
                     "",
                     `Payment: ${order.payment_methods?.join(", ") || "UPI"}`,
-                    `Trader: @${order.username || "anon"}`,
+                    `Trader: @${order.username || "anon"} (⭐ ${order.trust_score ?? 0}%)`,
+                    (order as any).upi_id ? `📱 UPI: \`${(order as any).upi_id}\`` : "",
                     "",
                     order.type === "sell"
                         ? "⚠️ Seller deposits USDC to escrow → You send fiat → Crypto released to you"

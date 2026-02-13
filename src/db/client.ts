@@ -157,10 +157,16 @@ class Database {
         const db = this.getClient();
         const { data } = await db
             .from("orders")
-            .select("*, users!inner(username, trust_score)")
+            .select("*, users!inner(username, trust_score, upi_id)")
             .eq("id", orderId)
             .single();
-        return data as Order | null;
+        if (!data) return null;
+        return {
+            ...data,
+            username: data.users?.username,
+            trust_score: data.users?.trust_score,
+            upi_id: data.users?.upi_id,
+        } as Order;
     }
 
     async getUserOrders(userId: string): Promise<Order[]> {
