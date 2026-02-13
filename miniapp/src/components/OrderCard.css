@@ -1,0 +1,91 @@
+.order-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    transition: all var(--transition-fast);
+}
+
+.order-card.tappable {
+    cursor: pointer;
+}
+
+.order-card.tappable:hover {
+    border-color: var(--green-border);
+    background: var(--bg-card-hover);
+}
+
+.order-card.tappable:active {
+    transform: scale(0.98);
+}
+
+.oc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.oc-token {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+}
+
+.oc-body {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.oc-amount,
+.oc-rate {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.oc-value {
+    font-size: 1.125rem;
+    font-weight: 700;
+}
+
+.oc-rate {
+    text-align: right;
+}
+
+.oc-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+}
+
+.oc-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-secondary);
+}
+
+.oc-trust {
+    font-size: 0.6875rem;
+    color: var(--yellow);
+}
+
+.oc-methods {
+    display: flex;
+    gap: 4px;
+}
+
+.oc-method {
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-full);
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+}

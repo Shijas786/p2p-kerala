@@ -1,0 +1,91 @@
+.wallet-selector {
+    padding: 24px 16px;
+    max-width: 400px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 32px;
+}
+
+.ws-header {
+    text-align: center;
+}
+
+.ws-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+}
+
+.ws-header h2 {
+    margin-bottom: 8px;
+}
+
+.ws-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.ws-option {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 16px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    text-align: left;
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.ws-option:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--green-border);
+    box-shadow: var(--shadow-glow);
+}
+
+.ws-option:active {
+    transform: scale(0.98);
+}
+
+.ws-option-icon {
+    font-size: 2rem;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+
+.ws-option-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.ws-option-content h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.ws-option-content p {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.ws-arrow {
+    font-size: 1.5rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.ws-footer {
+    margin-top: 8px;
+}

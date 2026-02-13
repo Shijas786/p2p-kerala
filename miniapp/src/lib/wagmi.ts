@@ -1,0 +1,39 @@
+// Reown (WalletConnect) + Wagmi configuration
+import { createAppKit } from '@reown/appkit/react';
+import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
+import { base } from '@reown/appkit/networks';
+
+const projectId = '6dcf53c47cdea609c48bc1adb474bfd0';
+
+const metadata = {
+    name: 'P2P Kerala',
+    description: 'Telegram P2P Crypto Exchange',
+    url: 'https://p2pkerala.com',
+    icons: ['https://p2pkerala.com/favicon.ico'],
+};
+
+// Create Wagmi adapter for Reown
+export const wagmiAdapter = new WagmiAdapter({
+    projectId,
+    networks: [base],
+});
+
+// Create the AppKit modal
+export const appKit = createAppKit({
+    adapters: [wagmiAdapter],
+    networks: [base],
+    projectId,
+    metadata,
+    features: {
+        analytics: false,
+        email: false,
+        socials: false,
+    },
+    themeMode: 'dark',
+    themeVariables: {
+        '--w3m-accent': '#84cc16',
+        '--w3m-border-radius-master': '2px',
+    },
+});
+
+export const wagmiConfig = wagmiAdapter.wagmiConfig;

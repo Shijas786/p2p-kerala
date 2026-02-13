@@ -1,0 +1,80 @@
+.p-user {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 20px;
+    margin-bottom: 16px;
+}
+
+.p-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--green), var(--green-dim));
+    color: var(--text-inverse);
+    font-size: 1.375rem;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+
+.p-user-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.p-user-info h2 {
+    font-size: 1.25rem;
+}
+
+/* Stats */
+.p-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.p-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 14px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.p-stat-value {
+    font-size: 1.125rem;
+    font-weight: 800;
+    color: var(--green);
+}
+
+/* Section */
+.p-section {
+    margin-bottom: 12px;
+    padding: 16px;
+}
+
+.p-account-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.p-account-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8125rem;
+}
+
+.p-account-row:last-child {
+    border-bottom: none;
+}

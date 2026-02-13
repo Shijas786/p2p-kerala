@@ -2,16 +2,24 @@ FROM node:20-slim
 
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies for main project
 COPY package*.json ./
 RUN npm install
 
-# Copy source
+# Copy all source files
 COPY . .
 
-# Build step (optional if using tsx, but good for error checking)
+# Build the Mini App frontend
+WORKDIR /app/miniapp
+RUN npm install
+RUN npx vite build
+
+# Build the backend
+WORKDIR /app
 RUN npm run build
 
-# Command to run the bot
-# Using tsx for simplicity, or npm run serve if built
+# Expose port
+EXPOSE 8000
+
+# Start the server
 CMD ["npm", "run", "start"]

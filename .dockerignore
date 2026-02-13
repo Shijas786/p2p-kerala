@@ -1,5 +1,5 @@
 node_modules
-dist
+miniapp/node_modules
 .env
 .git
 .github

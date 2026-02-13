@@ -1,0 +1,42 @@
+.trade-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.trade-card:hover {
+    border-color: var(--border-hover);
+    background: var(--bg-card-hover);
+}
+
+.trade-card:active {
+    transform: scale(0.98);
+}
+
+.tc-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.tc-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tc-amount {
+    font-size: 1.0625rem;
+    font-weight: 700;
+}
+
+.tc-bottom {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+}

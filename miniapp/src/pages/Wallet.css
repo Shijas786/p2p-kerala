@@ -1,0 +1,81 @@
+.w-address {
+    padding: 16px;
+    margin-bottom: 16px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.w-address-label {
+    margin-bottom: 6px;
+}
+
+.w-address-value {
+    max-width: 260px;
+    margin: 0 auto;
+}
+
+.w-copy-btn {
+    color: var(--green);
+    margin-top: 6px;
+    display: inline-block;
+}
+
+.w-tokens {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.w-token {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+}
+
+.w-token-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.w-token-icon {
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-elevated);
+    border-radius: var(--radius-md);
+}
+
+.w-token-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.w-token-symbol {
+    font-size: 0.9375rem;
+}
+
+.w-token-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.w-token-bal {
+    font-size: 1.0625rem;
+}
+
+.w-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.w-send {
+    padding: 20px 16px;
+}

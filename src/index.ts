@@ -3,6 +3,7 @@ import { env } from "./config/env";
 import { db } from "./db/client"; // Import DB for stats
 import express from "express";
 import path from "path";
+import { miniappRouter } from "./api/miniapp";
 
 async function main() {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -28,9 +29,27 @@ async function main() {
     const app = express();
     const port = process.env.PORT || 8000;
 
+    // CORS for Mini App
+    app.use((req, res, next) => {
+        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Telegram-Init-Data");
+        if (req.method === "OPTIONS") return res.sendStatus(204);
+        next();
+    });
+
+    // JSON body parser
+    app.use(express.json());
+
     // Serve static files from public folder
     // Uses process.cwd() to be safe across dev/prod (Docker)
     app.use(express.static(path.join(process.cwd(), "public")));
+
+    // Serve Mini App frontend (production build)
+    app.use("/app", express.static(path.join(process.cwd(), "miniapp", "dist")));
+
+    // Mount Mini App API
+    app.use("/api/miniapp", miniappRouter);
 
     // API Stats Endpoint (Consumed by the frontend)
     app.get("/api/stats", async (req, res) => {
@@ -49,6 +68,11 @@ async function main() {
 
     // Health Check (Koyeb needs a 200 OK)
     app.get("/health", (req, res) => res.send("OK"));
+
+    // Mini App SPA fallback — serves index.html for all /app/* routes so React Router works
+    app.get("/app/{*path}", (req, res) => {
+        res.sendFile(path.join(process.cwd(), "miniapp", "dist", "index.html"));
+    });
 
     // Fallback file serving (Express v5 uses {*path} instead of *)
     app.get("/{*path}", (req, res) => {
