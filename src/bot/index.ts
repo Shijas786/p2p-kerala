@@ -1426,8 +1426,8 @@ bot.on("callback_query:data", async (ctx) => {
                     `Buyer receives: ${formatUSDC(buyerReceives, order.token)}`,
                     "",
                     `Payment: ${order.payment_methods?.join(", ") || "UPI"}`,
-                    `Trader: @${order.username || "anon"} (⭐ ${order.trust_score ?? 0}%)`,
-                    (order as any).upi_id ? `📱 UPI: \`${(order as any).upi_id}\`` : "",
+                    `Trader: ${order.username ? "@" + order.username.replace(/_/g, "\\_") : "anon"} (⭐ ${order.trust_score ?? 0}%)`,
+                    (order as any).upi_id ? `📱 UPI: ${(order as any).upi_id}` : "",
                     "",
                     order.type === "sell"
                         ? "⚠️ Seller deposits USDC to escrow → You send fiat → Crypto released to you"
@@ -2029,13 +2029,13 @@ bot.on("callback_query:data", async (ctx) => {
                 "",
                 `Role: ${isBuyer ? "🟢 Buyer" : "🔴 Seller"}`,
                 `Status: *${trade.status.toUpperCase()}*`,
-                `ℹ️ _${statusDescriptions[trade.status] || ""}_`,
+                `ℹ️ ${statusDescriptions[trade.status] || ""}`,
                 "",
                 `Amount: *${formatUSDC(trade.amount, trade.token)}*`,
                 `Fiat: *${formatINR(trade.fiat_amount)}*`,
                 `Rate: ${formatINR(trade.rate)}/${trade.token}`,
                 "",
-                `Partner: @${partner?.username || "anon"}`,
+                `Partner: ${partner?.username ? "@" + partner.username.replace(/_/g, "\\_") : "anon"}`,
                 `Payment Method: ${trade.payment_method}`,
             ];
 
@@ -2046,9 +2046,9 @@ bot.on("callback_query:data", async (ctx) => {
                 const upiId = upiFromOrder || partner?.upi_id;
 
                 if (upiId) {
-                    details.push(`💳 *Seller UPI:* \`${upiId}\``);
+                    details.push(`💳 Seller UPI: ${upiId}`);
                 } else {
-                    details.push("⚠️ _Seller hasn't shared UPI in profile._");
+                    details.push("⚠️ Seller hasn't shared UPI in profile.");
                 }
             }
 
