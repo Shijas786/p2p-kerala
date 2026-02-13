@@ -60,6 +60,16 @@ async function main() {
         console.log(`  🌍 Visit http://localhost:${port} to see the landing page`);
     });
 
+    // Ensure no old webhooks are blocking long polling
+    try {
+        console.log("  Checking for existing webhooks...");
+        // Use bot instance directly
+        await bot.api.deleteWebhook({ drop_pending_updates: true });
+        console.log("  ✅ Webhook deleted (or none existed). Starting polling...");
+    } catch (err: any) {
+        console.log("  ⚠️ Webhook delete minor error:", err.message);
+    }
+
     bot.start({
         onStart: (botInfo) => {
             console.log(`  ✅ Bot started! @${botInfo.username}`);
