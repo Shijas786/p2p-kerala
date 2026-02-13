@@ -71,11 +71,21 @@ async function broadcast(message: string, keyboard?: InlineKeyboard) {
 
 async function ensureUser(ctx: BotContext): Promise<User> {
     const from = ctx.from!;
-    return db.getOrCreateUser(
-        from.id,
-        from.username || undefined,
-        from.first_name || undefined
+    console.log(`DEBUG: ensureUser for ${from.id}...`);
+
+    // Add a race to prevent hanging forever on DB issues
+    const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Database timeout in ensureUser")), 10000)
     );
+
+    return Promise.race([
+        db.getOrCreateUser(
+            from.id,
+            from.username || undefined,
+            from.first_name || undefined
+        ),
+        timeout
+    ]) as Promise<User>;
 }
 
 function isAdmin(ctx: BotContext): boolean {
@@ -148,6 +158,10 @@ bot.command("broadcast", async (ctx) => {
         } catch (e) { /* ignore blocked users */ }
     }
     await ctx.reply(`✅ Broadcast complete! Sent to ${sent}/${userIds.length} users.`);
+});
+
+bot.command("ping", async (ctx) => {
+    await ctx.reply(`🏓 Pong! (Bot Version: ${new Date().toISOString()})`);
 });
 
 bot.command("start", async (ctx) => {
@@ -1139,8 +1153,10 @@ bot.on("callback_query:data", async (ctx) => {
     }
 
     // Handle AI-generated Sell Order confirmation
-    if (data.startsWith("create_sell:")) {
-        console.log("DEBUG: create_sell callback received:", data);
+    if (data.startsWith("confirm_sell:")) {
+        console.log("DEBUG: confirm_sell callback received:", data);
+        await ctx.answerCallbackQuery({ text: "Processing Sell Confirmation..." });
+        handled = true;
         try {
             const parts = data.split(":");
             if (parts.length < 3) throw new Error("Invalid callback data format");
@@ -1178,6 +1194,7 @@ bot.on("callback_query:data", async (ctx) => {
             console.log("DEBUG: Editing message to Step 3/3");
             await ctx.editMessageText(text, { parse_mode: "Markdown", reply_markup: keyboard });
             await ctx.answerCallbackQuery();
+            handled = true;
         } catch (err: any) {
             console.error("DEBUG: Error in create_sell handler:", err);
             await ctx.answerCallbackQuery({ text: "❌ Error: " + err.message, show_alert: true });
@@ -1185,8 +1202,10 @@ bot.on("callback_query:data", async (ctx) => {
     }
 
     // Handle AI-generated Buy Order confirmation
-    if (data.startsWith("create_buy:")) {
-        console.log("DEBUG: create_buy callback received:", data);
+    if (data.startsWith("confirm_buy:")) {
+        console.log("DEBUG: confirm_buy callback received:", data);
+        await ctx.answerCallbackQuery({ text: "Processing Buy Confirmation..." });
+        handled = true;
         try {
             const parts = data.split(":");
             if (parts.length < 3) throw new Error("Invalid callback data format");
@@ -1224,8 +1243,9 @@ bot.on("callback_query:data", async (ctx) => {
             console.log("DEBUG: Editing message to Step 3/3");
             await ctx.editMessageText(text, { parse_mode: "Markdown", reply_markup: keyboard });
             await ctx.answerCallbackQuery();
+            handled = true;
         } catch (err: any) {
-            console.error("DEBUG: Error in create_buy handler:", err);
+            console.error("DEBUG: Error in confirm_buy handler:", err);
             await ctx.answerCallbackQuery({ text: "❌ Error: " + err.message, show_alert: true });
         }
     }
@@ -2721,7 +2741,7 @@ bot.on("message:text", async (ctx) => {
             case "CREATE_SELL_ORDER":
                 if (intent.params.amount && intent.params.rate) {
                     // We have enough info to create the order
-                    const callbackData = `create_sell:${intent.params.amount}:${intent.params.rate}`;
+                    const callbackData = `confirm_sell:${intent.params.amount}:${intent.params.rate}`;
                     console.log(`DEBUG: Creating SELL button with data: ${callbackData}`);
 
                     const keyboard = new InlineKeyboard()
@@ -2751,8 +2771,11 @@ bot.on("message:text", async (ctx) => {
 
             case "CREATE_BUY_ORDER":
                 if (intent.params.amount && intent.params.rate) {
+                    const callbackData = `confirm_buy:${intent.params.amount}:${intent.params.rate}`;
+                    console.log(`DEBUG: Creating BUY button with data: ${callbackData}`);
+
                     const keyboard = new InlineKeyboard()
-                        .text("✅ Confirm Order", `create_buy:${intent.params.amount}:${intent.params.rate}`)
+                        .text("✅ Confirm Order", callbackData)
                         .text("❌ Cancel", "cancel_action");
 
                     await ctx.reply(
