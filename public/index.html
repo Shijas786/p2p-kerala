@@ -80,30 +80,22 @@
     <div class="max-w-6xl mx-auto px-4 mb-20">
         <div class="flex justify-between items-end mb-6">
             <h2 class="text-3xl font-bold">📢 Live Market</h2>
-            <a href="https://t.me/p2pkerala_bot" class="text-emerald-400 hover:text-emerald-300 font-medium">View all on
-                Telegram &rarr;</a>
+
+            <!-- Toggles -->
+            <div class="flex bg-slate-800 p-1 rounded-lg gap-1">
+                <button onclick="switchTab('sell')" id="tab-sell"
+                    class="px-4 py-2 rounded-md font-medium text-sm transition bg-emerald-600 text-white">Buy
+                    Crypto</button>
+                <button onclick="switchTab('buy')" id="tab-buy"
+                    class="px-4 py-2 rounded-md font-medium text-sm transition text-slate-400 hover:text-white">Sell
+                    Crypto</button>
+            </div>
         </div>
 
         <div id="ads-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <!-- Loading Skeleton -->
-            <div class="glass p-6 rounded-2xl animate-pulse">
-                <div class="h-6 bg-slate-700 rounded w-1/3 mb-4"></div>
-                <div class="h-10 bg-slate-700 rounded w-1/2 mb-4"></div>
-                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
-            </div>
-            <div class="glass p-6 rounded-2xl animate-pulse hidden md:block">
-                <div class="h-6 bg-slate-700 rounded w-1/3 mb-4"></div>
-                <div class="h-10 bg-slate-700 rounded w-1/2 mb-4"></div>
-                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
-            </div>
-            <div class="glass p-6 rounded-2xl animate-pulse hidden lg:block">
-                <div class="h-6 bg-slate-700 rounded w-1/3 mb-4"></div>
-                <div class="h-10 bg-slate-700 rounded w-1/2 mb-4"></div>
-                <div class="h-4 bg-slate-700 rounded w-3/4"></div>
-            </div>
+            <!-- Content loaded via JS -->
         </div>
-        <p id="no-ads-msg" class="text-center text-slate-500 mt-8 hidden">No active sell orders right now. Be the first
-            to sell!</p>
+        <p id="no-ads-msg" class="text-center text-slate-500 mt-8 hidden">No active orders right now.</p>
     </div>
 
     <!-- How It Works -->
@@ -216,34 +208,76 @@
         }
 
 
+        let currentAds = { sell: [], buy: [] };
+        let activeTab = 'sell'; // 'sell' means user wants to BUY (viewing Sell ads)
+
+        function switchTab(tab) {
+            activeTab = tab;
+            // Update Tab UI
+            const sellBtn = document.getElementById('tab-sell');
+            const buyBtn = document.getElementById('tab-buy');
+
+            if (tab === 'sell') {
+                sellBtn.className = "px-4 py-2 rounded-md font-medium text-sm transition bg-emerald-600 text-white shadow-lg shadow-emerald-500/20";
+                buyBtn.className = "px-4 py-2 rounded-md font-medium text-sm transition text-slate-400 hover:text-white hover:bg-slate-700";
+            } else {
+                sellBtn.className = "px-4 py-2 rounded-md font-medium text-sm transition text-slate-400 hover:text-white hover:bg-slate-700";
+                buyBtn.className = "px-4 py-2 rounded-md font-medium text-sm transition bg-blue-600 text-white shadow-lg shadow-blue-500/20";
+            }
+            renderAds();
+        }
+
         async function fetchAds() {
             try {
                 const res = await fetch('/api/ads');
                 const data = await res.json();
-                const container = document.getElementById('ads-container');
-                const noAdsMsg = document.getElementById('no-ads-msg');
+                currentAds = data;
+                renderAds();
+            } catch (e) {
+                console.error("Failed to load ads", e);
+            }
+        }
 
-                if (!data.ads || data.ads.length === 0) {
-                    container.innerHTML = '';
-                    noAdsMsg.classList.remove('hidden');
-                    return;
-                }
+        function renderAds() {
+            const container = document.getElementById('ads-container');
+            const noAdsMsg = document.getElementById('no-ads-msg');
+            const ads = currentAds[activeTab] || [];
 
-                noAdsMsg.classList.add('hidden');
-                container.innerHTML = data.ads.map(ad => `
-                    <div class="glass p-6 rounded-2xl border-l-4 border-emerald-500 hover:bg-white/5 transition group">
+            if (ads.length === 0) {
+                container.innerHTML = '';
+                noAdsMsg.classList.remove('hidden');
+                noAdsMsg.innerText = activeTab === 'sell'
+                    ? "No one is selling right now. Check back soon!"
+                    : "No one is buying right now. Be the first to create a Buy Ad on Telegram!";
+                return;
+            }
+
+            noAdsMsg.classList.add('hidden');
+
+            const isSellTab = activeTab === 'sell'; // Viewing Sell Ads -> User Buys
+            const actionColor = isSellTab ? 'emerald' : 'blue';
+            const actionText = isSellTab ? 'Buy Now' : 'Sell Now';
+            const actionLinkPrefix = isSellTab ? 'buy' : 'sell';
+
+            container.innerHTML = ads.map(ad => `
+                <div class="glass p-6 rounded-2xl border-l-4 border-${actionColor}-500 hover:bg-white/5 transition group relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 text-6xl font-bold select-none text-${actionColor}-500">
+                        ${ad.token}
+                    </div>
+
+                    <div class="relative z-10">
                         <div class="flex justify-between items-start mb-4">
                             <div>
-                                <div class="text-sm text-slate-400">Selling ${ad.token}</div>
+                                <div class="text-sm text-slate-400">${isSellTab ? 'Selling' : 'Buying'} ${ad.token}</div>
                                 <div class="text-2xl font-bold text-white">${ad.amount} <span class="text-sm font-normal text-slate-400">${ad.token}</span></div>
                             </div>
-                            <div class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-bold">
+                            <div class="bg-${actionColor}-500/20 text-${actionColor}-400 px-3 py-1 rounded-full text-sm font-bold">
                                 ₹${ad.rate}
                             </div>
                         </div>
                         
                         <div class="flex items-center gap-3 mb-6">
-                            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
+                            <div class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-300">
                                 ${ad.seller.username ? ad.seller.username[0].toUpperCase() : 'U'}
                             </div>
                             <div>
@@ -252,20 +286,17 @@
                             </div>
                         </div>
 
-                        <div class="flex justify-between items-center text-sm">
-                            <div class="text-slate-400">Limits: ₹${ad.min_limit} - ₹${ad.max_limit}</div>
+                        <div class="flex justify-between items-center text-sm mb-4">
+                            <div class="text-slate-400">Limits: <span class="text-slate-200">₹${ad.min_limit} - ₹${ad.max_limit}</span></div>
                         </div>
 
-                        <a href="https://t.me/p2pkerala_bot?start=buy_${ad.id}" target="_blank" 
-                           class="mt-4 block w-full text-center bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-lg font-medium transition opacity-80 group-hover:opacity-100">
-                            Buy Now
+                        <a href="https://t.me/p2pkerala_bot?start=${actionLinkPrefix}_${ad.id}" target="_blank" 
+                           class="block w-full text-center bg-${actionColor}-600 hover:bg-${actionColor}-500 text-white py-3 rounded-xl font-bold transition transform group-hover:scale-[1.02] shadow-lg shadow-${actionColor}-500/20">
+                            ${actionText}
                         </a>
                     </div>
-                `).join('');
-
-            } catch (e) {
-                console.error("Failed to load ads", e);
-            }
+                </div>
+            `).join('');
         }
 
         // Auth Logic

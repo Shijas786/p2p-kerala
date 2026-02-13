@@ -369,7 +369,7 @@ class Database {
         const db = this.getClient();
         const [trades, orders, users, fees, disputes] = await Promise.all([
             db.from("trades").select("id, status, amount", { count: "exact" }),
-            db.from("orders").select("id", { count: "exact" }).eq("status", "active").eq("type", "sell"),
+            db.from("orders").select("id", { count: "exact" }).eq("status", "active"),
             db.from("users").select("id", { count: "exact" }),
             this.getTotalFees(),
             db.from("trades").select("id", { count: "exact" }).eq("status", "disputed"),
