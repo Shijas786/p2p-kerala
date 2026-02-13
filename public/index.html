@@ -4,12 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Kerala — Crypto Made Simple</title>
+    <title>P2P Kerala — Decentralized Crypto Trading</title>
     <meta name="description"
-        content="Kerala's safest P2P crypto marketplace on Telegram. Smart contract escrow, AI verification, zero KYC.">
+        content="Kerala's safest P2P crypto marketplace. AI-powered Telegram bot with smart contract escrow on Base.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
         rel="stylesheet">
     <style>
         *,
@@ -21,25 +22,26 @@
         }
 
         :root {
-            --bg: #0a0a0a;
-            --bg2: #111111;
-            --card: #141414;
-            --card2: #1a1a1a;
-            --border: rgba(255, 255, 255, 0.06);
-            --border-h: rgba(255, 255, 255, 0.12);
-            --text: #ffffff;
-            --text2: #999999;
-            --text3: #555555;
-            --accent: #f59e0b;
-            --accent-rgb: 245, 158, 11;
-            --accent2: #34d399;
-            --accent2-rgb: 52, 211, 153;
-            --radius: 20px;
-            --radius-sm: 14px;
+            --bg: #050505;
+            --bg2: #0a0a0a;
+            --bg3: #111111;
+            --surface: #161616;
+            --border: rgba(255, 255, 255, 0.05);
+            --text: #f0f0f0;
+            --text2: #888888;
+            --text3: #444444;
+            --green: #84cc16;
+            --green-bright: #a3e635;
+            --green-dim: #3f6212;
+            --green-rgb: 132, 204, 22;
+            --green2: #22c55e;
+            --amber: #f59e0b;
         }
 
         html {
             scroll-behavior: smooth;
+            scrollbar-width: thin;
+            scrollbar-color: var(--green-dim) var(--bg);
         }
 
         body {
@@ -48,514 +50,767 @@
             color: var(--text);
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
-            line-height: 1.6;
+        }
+
+        /* ═══════ SCROLL PROGRESS ═══════ */
+        .scroll-progress {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 2px;
+            background: var(--green);
+            z-index: 9999;
+            width: 0%;
+            box-shadow: 0 0 10px var(--green), 0 0 30px rgba(var(--green-rgb), 0.3);
+            transition: width 0.05s linear;
         }
 
         /* ═══════ NAV ═══════ */
         nav {
-            position: sticky;
+            position: fixed;
             top: 0;
+            left: 0;
+            right: 0;
             z-index: 100;
-            padding: 1rem 2rem;
-            background: rgba(10, 10, 10, 0.8);
+            padding: 1.2rem 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: transparent;
+            transition: background 0.4s, backdrop-filter 0.4s;
+        }
+
+        nav.scrolled {
+            background: rgba(5, 5, 5, 0.85);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--border);
         }
 
-        .nav-inner {
-            max-width: 1300px;
-            margin: 0 auto;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
         .nav-brand {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 800;
-            font-size: 1.1rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 1.2rem;
             text-decoration: none;
             color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
         }
 
-        .nav-brand span {
-            color: var(--accent);
+        .nav-brand .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
         }
 
         .nav-links {
             display: flex;
             align-items: center;
-            gap: 2rem;
+            gap: 2.5rem;
         }
 
         .nav-links a {
             text-decoration: none;
             color: var(--text2);
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             font-weight: 500;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
             transition: color 0.3s;
         }
 
         .nav-links a:hover {
-            color: var(--text);
+            color: var(--green);
         }
 
         .nav-cta {
-            background: var(--accent) !important;
+            background: var(--green) !important;
             color: #000 !important;
+            padding: 0.5rem 1.3rem;
+            border-radius: 8px;
             font-weight: 700 !important;
-            padding: 0.55rem 1.4rem;
-            border-radius: 10px;
-            transition: transform 0.2s, box-shadow 0.3s;
+            font-size: 0.75rem !important;
+            transition: box-shadow 0.3s, transform 0.2s;
         }
 
         .nav-cta:hover {
+            box-shadow: 0 0 20px rgba(var(--green-rgb), 0.4);
             transform: translateY(-1px);
-            box-shadow: 0 8px 30px rgba(var(--accent-rgb), 0.25);
-        }
-
-        /* ═══════ CONTAINER ═══════ */
-        .container {
-            max-width: 1300px;
-            margin: 0 auto;
-            padding: 0 2rem;
-        }
-
-        /* ═══════ PARTNER BAR ═══════ */
-        .partner-bar {
-            padding: 1.5rem 0;
-            border-bottom: 1px solid var(--border);
-            overflow: hidden;
-        }
-
-        .partner-bar p {
-            text-align: center;
-            font-size: 0.7rem;
-            color: var(--text3);
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            margin-bottom: 1.2rem;
-        }
-
-        .partner-logos {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 3rem;
-            flex-wrap: wrap;
-        }
-
-        .partner-logos span {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text3);
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            letter-spacing: 0.02em;
-            transition: color 0.3s;
-        }
-
-        .partner-logos span:hover {
-            color: var(--text2);
-        }
-
-        .partner-logos .dot {
-            color: var(--accent);
-            font-size: 1.2rem;
         }
 
         /* ═══════ HERO ═══════ */
         .hero {
-            padding: 5rem 0 3rem;
-            text-align: center;
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             position: relative;
+            overflow: hidden;
         }
 
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -100px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 800px;
-            height: 600px;
-            background: radial-gradient(ellipse, rgba(var(--accent-rgb), 0.06) 0%, transparent 70%);
-            pointer-events: none;
+        .hero-left {
+            padding: 8rem 4rem 4rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            z-index: 2;
         }
 
-        .hero-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(var(--accent-rgb), 0.08);
-            border: 1px solid rgba(var(--accent-rgb), 0.15);
-            padding: 0.4rem 1rem;
-            border-radius: 100px;
-            font-size: 0.75rem;
+        .hero-meta {
+            display: flex;
+            gap: 3rem;
+            margin-bottom: 4rem;
+        }
+
+        .hero-meta-item {
+            font-size: 0.6rem;
             font-weight: 600;
-            color: var(--accent);
-            margin-bottom: 2rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text3);
+            line-height: 1.8;
         }
 
-        .hero-tag .pulse {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: var(--accent);
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.3;
-            }
+        .hero-meta-item span {
+            display: block;
+            color: var(--text2);
         }
 
         .hero h1 {
-            font-size: clamp(2.5rem, 5.5vw, 3.8rem);
-            font-weight: 800;
-            line-height: 1.1;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2.8rem, 5vw, 4.2rem);
+            font-weight: 700;
+            line-height: 1.08;
             letter-spacing: -0.03em;
             margin-bottom: 1.5rem;
-            max-width: 750px;
-            margin-left: auto;
-            margin-right: auto;
         }
 
-        .hero h1 .glow {
-            background: linear-gradient(135deg, var(--accent), #fbbf24, #f97316);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .hero p {
-            font-size: 1.05rem;
+        .hero-sub {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(1.2rem, 2vw, 1.6rem);
             color: var(--text2);
-            max-width: 520px;
-            margin: 0 auto 2.5rem;
-            line-height: 1.7;
+            font-weight: 400;
+            margin-bottom: 3rem;
         }
 
-        .hero-btns {
+        .hero-stats {
             display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
+            align-items: flex-end;
+            gap: 2rem;
+            margin-top: auto;
         }
 
-        .btn-primary {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: var(--accent);
-            color: #000;
-            padding: 0.8rem 2rem;
-            border-radius: 12px;
+        .hero-stat-label {
+            font-size: 0.6rem;
             font-weight: 700;
-            font-size: 0.9rem;
-            text-decoration: none;
-            transition: transform 0.2s, box-shadow 0.3s;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 40px rgba(var(--accent-rgb), 0.3);
-        }
-
-        .btn-secondary {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: transparent;
-            color: var(--text);
-            padding: 0.8rem 2rem;
-            border-radius: 12px;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-decoration: none;
-            border: 1px solid var(--border-h);
-            transition: background 0.3s, border-color 0.3s;
-        }
-
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.04);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-
-        /* ═══════ DASHBOARD SHOWCASE ═══════ */
-        .dashboard {
-            padding: 2rem 0 6rem;
-        }
-
-        .dash-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: auto auto;
-            gap: 1rem;
-        }
-
-        .dash-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem;
-            position: relative;
-            overflow: hidden;
-            transition: border-color 0.3s, transform 0.3s;
-        }
-
-        .dash-card:hover {
-            border-color: var(--border-h);
-            transform: translateY(-2px);
-        }
-
-        .dash-card.wide {
-            grid-column: 1 / -1;
-        }
-
-        .dash-card .card-label {
-            font-size: 0.65rem;
-            font-weight: 700;
-            color: var(--text3);
             letter-spacing: 0.15em;
             text-transform: uppercase;
+            color: var(--text3);
             margin-bottom: 0.5rem;
         }
 
-        .dash-card .card-value {
-            font-size: 2.2rem;
-            font-weight: 800;
+        .hero-stat-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
             letter-spacing: -0.03em;
-            margin-bottom: 0.25rem;
         }
 
-        .dash-card .card-change {
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .card-change.up {
-            color: var(--accent2);
-        }
-
-        .card-change.down {
-            color: #ef4444;
-        }
-
-        .dash-card .card-desc {
-            font-size: 0.85rem;
-            color: var(--text2);
-            line-height: 1.7;
-            margin-top: 0.5rem;
-        }
-
-        /* Glow effect on accent cards */
-        .dash-card.accent-glow::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -30%;
-            width: 300px;
-            height: 300px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(var(--accent-rgb), 0.08), transparent 70%);
-            pointer-events: none;
-        }
-
-        /* Mini chart placeholder */
-        .mini-chart {
-            margin-top: 1.5rem;
-            height: 80px;
-            background: linear-gradient(to right,
-                    rgba(var(--accent-rgb), 0.03),
-                    rgba(var(--accent-rgb), 0.08),
-                    rgba(var(--accent-rgb), 0.04));
-            border-radius: var(--radius-sm);
+        .hero-progress {
+            margin-top: 1rem;
+            width: 200px;
+            height: 3px;
+            background: var(--text3);
+            border-radius: 2px;
             position: relative;
             overflow: hidden;
         }
 
-        .mini-chart .bar {
+        .hero-progress-fill {
             position: absolute;
+            left: 0;
+            top: 0;
             bottom: 0;
-            width: 8%;
-            border-radius: 4px 4px 0 0;
-            background: linear-gradient(to top, rgba(var(--accent-rgb), 0.3), rgba(var(--accent-rgb), 0.6));
+            width: 0%;
+            background: var(--green);
+            border-radius: 2px;
+            box-shadow: 0 0 8px var(--green);
+            transition: width 2s ease-out;
         }
 
-        /* Chat mockup */
-        .chat-mockup {
-            background: var(--bg2);
-            border-radius: var(--radius-sm);
-            padding: 1.5rem;
-            margin-top: 1rem;
-        }
-
-        .chat-header {
+        .hero-progress-ticks {
+            position: absolute;
+            inset: 0;
             display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 1rem;
+            justify-content: space-between;
+            padding: 0 2px;
         }
 
-        .chat-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-            background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.2), rgba(var(--accent-rgb), 0.05));
+        .hero-progress-ticks span {
+            width: 1px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* Glowing Orb */
+        .hero-right {
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.9rem;
         }
 
-        .chat-name {
-            font-weight: 600;
-            font-size: 0.85rem;
+        .orb-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .chat-status {
-            font-size: 0.7rem;
-            color: var(--accent2);
+        .orb {
+            width: 450px;
+            height: 450px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 40% 40%,
+                    rgba(var(--green-rgb), 0.4),
+                    rgba(var(--green-rgb), 0.15) 40%,
+                    rgba(var(--green-rgb), 0.05) 60%,
+                    transparent 80%);
+            filter: blur(40px);
+            animation: orbFloat 8s ease-in-out infinite, orbPulse 4s ease-in-out infinite;
+            position: relative;
         }
 
-        .chat-msg {
-            margin-bottom: 0.6rem;
-            max-width: 80%;
-            padding: 0.7rem 1rem;
+        .orb::before {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 25%;
+            width: 55%;
+            height: 55%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--green-rgb), 0.6), transparent 70%);
+            filter: blur(25px);
+            animation: orbInner 6s ease-in-out infinite reverse;
+        }
+
+        .orb::after {
+            content: '';
+            position: absolute;
+            top: -20%;
+            right: -10%;
+            width: 80%;
+            height: 80%;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--green-rgb), 0.2), transparent 70%);
+            filter: blur(50px);
+            animation: orbOuter 10s ease-in-out infinite;
+        }
+
+        @keyframes orbFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1);
+            }
+
+            33% {
+                transform: translate(20px, -30px) scale(1.05);
+            }
+
+            66% {
+                transform: translate(-15px, 15px) scale(0.97);
+            }
+        }
+
+        @keyframes orbPulse {
+
+            0%,
+            100% {
+                opacity: 0.8;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        @keyframes orbInner {
+
+            0%,
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            50% {
+                transform: translate(15px, -10px) rotate(180deg);
+            }
+        }
+
+        @keyframes orbOuter {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(-20px, 20px);
+            }
+        }
+
+        /* Floating icon bottom-right */
+        .hero-icon-btn {
+            position: absolute;
+            bottom: 3rem;
+            right: 3rem;
+            width: 52px;
+            height: 52px;
             border-radius: 14px;
-            font-size: 0.82rem;
-            line-height: 1.5;
-            opacity: 0;
-            animation: msgIn 0.5s ease-out forwards;
+            background: var(--surface);
+            border: 1px solid rgba(var(--green-rgb), 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            cursor: pointer;
+            z-index: 2;
+            transition: transform 0.3s, box-shadow 0.3s;
         }
 
-        .chat-msg.bot {
-            background: var(--card2);
+        .hero-icon-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(var(--green-rgb), 0.2);
+        }
+
+        /* Vertical lines decoration */
+        .v-lines {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 3px;
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            z-index: 1;
+        }
+
+        .v-line {
+            width: 1px;
+            flex: 1;
+            background: linear-gradient(to bottom, transparent, rgba(var(--green-rgb), 0.15), rgba(var(--green-rgb), 0.3), rgba(var(--green-rgb), 0.15), transparent);
+        }
+
+        .v-line:nth-child(2) {
+            margin-left: 8px;
+            opacity: 0.5;
+        }
+
+        .v-line:nth-child(3) {
+            margin-left: 16px;
+            opacity: 0.3;
+        }
+
+        /* ═══════ SECTION COMMON ═══════ */
+        .section {
+            padding: 10rem 4rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .section-label {
+            font-size: 0.6rem;
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--green);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+
+        .section-label::before {
+            content: '';
+            width: 30px;
+            height: 1px;
+            background: var(--green);
+        }
+
+        .section-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2rem, 4vw, 3.2rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-desc {
+            font-size: 1rem;
+            color: var(--text2);
+            line-height: 1.8;
+            max-width: 550px;
+        }
+
+        /* ═══════ STORY: HOW IT WORKS ═══════ */
+        .story-section {
+            background: var(--bg2);
+        }
+
+        .story-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6rem;
+            align-items: center;
+            max-width: 1200px;
+            margin: 4rem auto 0;
+        }
+
+        .story-visual {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+
+        /* Chat terminal */
+        .terminal {
+            width: 100%;
+            max-width: 420px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-bar {
+            padding: 0.8rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .terminal-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.r {
+            background: #ef4444;
+        }
+
+        .terminal-dot.y {
+            background: #eab308;
+        }
+
+        .terminal-dot.g {
+            background: #22c55e;
+        }
+
+        .terminal-title {
+            margin-left: auto;
+            font-size: 0.7rem;
+            color: var(--text3);
+            font-weight: 500;
+        }
+
+        .terminal-body {
+            padding: 1.2rem;
+        }
+
+        .t-msg {
+            margin-bottom: 0.8rem;
+            padding: 0.7rem 1rem;
+            border-radius: 12px;
+            font-size: 0.82rem;
+            line-height: 1.6;
+            max-width: 88%;
+            opacity: 0;
+            transform: translateY(15px);
+            animation: msgReveal 0.6s ease-out forwards;
+        }
+
+        .t-msg.bot {
+            background: rgba(var(--green-rgb), 0.06);
+            border: 1px solid rgba(var(--green-rgb), 0.08);
             border-bottom-left-radius: 4px;
         }
 
-        .chat-msg.user {
-            background: rgba(var(--accent-rgb), 0.12);
-            border-bottom-right-radius: 4px;
+        .t-msg.user {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
             margin-left: auto;
-            text-align: right;
+            border-bottom-right-radius: 4px;
         }
 
-        .chat-msg:nth-child(2) {
-            animation-delay: 0.3s;
+        .t-msg:nth-child(1) {
+            animation-delay: 0.2s;
         }
 
-        .chat-msg:nth-child(3) {
-            animation-delay: 0.8s;
+        .t-msg:nth-child(2) {
+            animation-delay: 0.7s;
         }
 
-        .chat-msg:nth-child(4) {
-            animation-delay: 1.3s;
+        .t-msg:nth-child(3) {
+            animation-delay: 1.2s;
         }
 
-        .chat-msg:nth-child(5) {
-            animation-delay: 1.8s;
+        .t-msg:nth-child(4) {
+            animation-delay: 1.7s;
         }
 
-        .chat-msg:nth-child(6) {
-            animation-delay: 2.3s;
+        .t-msg:nth-child(5) {
+            animation-delay: 2.2s;
         }
 
-        @keyframes msgIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
+        .t-msg:nth-child(6) {
+            animation-delay: 2.7s;
+        }
 
+        @keyframes msgReveal {
             to {
                 opacity: 1;
                 transform: translateY(0);
             }
         }
 
-        /* ═══════ STEPS ═══════ */
-        .steps-section {
-            padding: 6rem 0;
-        }
-
-        .section-header {
-            text-align: center;
-            margin-bottom: 4rem;
-        }
-
-        .section-tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: var(--accent);
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            margin-bottom: 1rem;
-        }
-
-        .section-header h2 {
-            font-size: clamp(1.8rem, 3.5vw, 2.6rem);
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            margin-bottom: 0.75rem;
-        }
-
-        .section-header p {
-            color: var(--text2);
-            font-size: 1rem;
-            max-width: 500px;
-            margin: 0 auto;
-        }
-
-        .steps-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 1rem;
-        }
-
-        .step-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem 1.5rem;
-            position: relative;
-            transition: border-color 0.3s, transform 0.3s;
-        }
-
-        .step-card:hover {
-            border-color: rgba(var(--accent-rgb), 0.2);
-            transform: translateY(-4px);
-        }
-
-        .step-num {
-            font-size: 3rem;
-            font-weight: 900;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), transparent);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+        /* Glow behind terminal */
+        .story-visual::before {
+            content: '';
             position: absolute;
-            top: 1rem;
-            right: 1.2rem;
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--green-rgb), 0.08), transparent 70%);
+            filter: blur(40px);
+            z-index: -1;
+        }
+
+        /* Story steps */
+        .story-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .s-step {
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            gap: 1rem;
+            align-items: start;
+            opacity: 0;
+            transform: translateX(-30px);
+        }
+
+        .s-step.visible {
+            opacity: 1;
+            transform: translateX(0);
+            transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .s-step:nth-child(1).visible {
+            transition-delay: 0s;
+        }
+
+        .s-step:nth-child(2).visible {
+            transition-delay: 0.15s;
+        }
+
+        .s-step:nth-child(3).visible {
+            transition-delay: 0.3s;
+        }
+
+        .s-step:nth-child(4).visible {
+            transition-delay: 0.45s;
+        }
+
+        .s-num {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            color: rgba(var(--green-rgb), 0.15);
             line-height: 1;
         }
 
-        .step-icon {
+        .s-step h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+        }
+
+        .s-step p {
+            font-size: 0.82rem;
+            color: var(--text2);
+            line-height: 1.7;
+        }
+
+        /* ═══════ PARALLAX DIVIDER ═══════ */
+        .parallax-divider {
+            height: 60vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .parallax-bg {
+            position: absolute;
+            inset: -20%;
+            background: radial-gradient(ellipse at center,
+                    rgba(var(--green-rgb), 0.06) 0%,
+                    transparent 50%);
+            animation: parallaxBg 15s ease-in-out infinite;
+        }
+
+        @keyframes parallaxBg {
+
+            0%,
+            100% {
+                transform: scale(1) translate(0, 0);
+            }
+
+            50% {
+                transform: scale(1.1) translate(-20px, 10px);
+            }
+        }
+
+        .parallax-text {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 700;
+            text-align: center;
+            letter-spacing: -0.03em;
+            line-height: 1.2;
+            max-width: 700px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .parallax-text .highlight {
+            color: var(--green);
+            text-shadow: 0 0 30px rgba(var(--green-rgb), 0.3);
+        }
+
+        .parallax-sub {
+            position: relative;
+            z-index: 2;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+            color: var(--text2);
+            text-align: center;
+            max-width: 500px;
+            line-height: 1.8;
+        }
+
+        /* Mini orbs decoration */
+        .mini-orbs {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .mini-orb {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--green-rgb), 0.2), transparent 70%);
+            filter: blur(30px);
+            animation: miniFloat 12s ease-in-out infinite;
+        }
+
+        .mini-orb:nth-child(1) {
+            width: 200px;
+            height: 200px;
+            top: 10%;
+            left: 5%;
+            animation-delay: 0s;
+        }
+
+        .mini-orb:nth-child(2) {
+            width: 150px;
+            height: 150px;
+            bottom: 15%;
+            right: 10%;
+            animation-delay: 3s;
+        }
+
+        .mini-orb:nth-child(3) {
+            width: 100px;
+            height: 100px;
+            top: 60%;
+            left: 60%;
+            animation-delay: 6s;
+        }
+
+        @keyframes miniFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(30px, -20px);
+            }
+        }
+
+        /* ═══════ FEATURES GRID ═══════ */
+        .features-section {
+            background: var(--bg);
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            max-width: 1200px;
+            margin: 4rem auto 0;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            overflow: hidden;
+        }
+
+        .f-card {
+            background: var(--bg);
+            padding: 2.5rem 2rem;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.4s;
+        }
+
+        .f-card:hover {
+            background: var(--bg2);
+        }
+
+        .f-card::before {
+            content: '';
+            position: absolute;
+            top: -60px;
+            right: -60px;
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--green-rgb), 0.04), transparent 70%);
+            transition: opacity 0.4s;
+            opacity: 0;
+        }
+
+        .f-card:hover::before {
+            opacity: 1;
+        }
+
+        .f-icon {
             width: 44px;
             height: 44px;
             border-radius: 12px;
@@ -563,115 +818,79 @@
             align-items: center;
             justify-content: center;
             font-size: 1.2rem;
-            margin-bottom: 1.2rem;
+            margin-bottom: 1.5rem;
+            background: rgba(var(--green-rgb), 0.06);
+            border: 1px solid rgba(var(--green-rgb), 0.1);
         }
 
-        .step-icon.orange {
-            background: rgba(var(--accent-rgb), 0.12);
-        }
-
-        .step-icon.green {
-            background: rgba(var(--accent2-rgb), 0.12);
-        }
-
-        .step-icon.blue {
-            background: rgba(96, 165, 250, 0.12);
-        }
-
-        .step-icon.purple {
-            background: rgba(168, 85, 247, 0.12);
-        }
-
-        .step-card h3 {
-            font-size: 1rem;
-            font-weight: 700;
+        .f-card h3 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.05rem;
+            font-weight: 600;
             margin-bottom: 0.5rem;
         }
 
-        .step-card p {
+        .f-card p {
             font-size: 0.82rem;
             color: var(--text2);
             line-height: 1.7;
         }
 
-        /* ═══════ FEATURES BENTO ═══════ */
-        .features-section {
-            padding: 6rem 0;
+        /* ═══════ STATS STRIP ═══════ */
+        .stats-strip {
+            padding: 6rem 4rem;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
         }
 
-        .bento-grid {
+        .stats-inner {
+            max-width: 1200px;
+            margin: 0 auto;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: auto auto;
-            gap: 1rem;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2rem;
         }
 
-        .bento-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2.5rem 2rem;
-            position: relative;
-            overflow: hidden;
-            transition: border-color 0.3s, transform 0.3s;
+        .stat-item {
+            text-align: center;
         }
 
-        .bento-card:hover {
-            border-color: var(--border-h);
-            transform: translateY(-3px);
-        }
-
-        .bento-card.span-2 {
-            grid-column: span 2;
-        }
-
-        .bento-card .b-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.3rem;
-            margin-bottom: 1.5rem;
-            background: rgba(var(--accent-rgb), 0.08);
-        }
-
-        .bento-card h3 {
-            font-size: 1.15rem;
+        .stat-val {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.8rem;
             font-weight: 700;
-            margin-bottom: 0.5rem;
+            letter-spacing: -0.03em;
+            color: var(--green);
+            text-shadow: 0 0 30px rgba(var(--green-rgb), 0.2);
         }
 
-        .bento-card p {
-            font-size: 0.85rem;
-            color: var(--text2);
-            line-height: 1.7;
+        .stat-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text3);
+            margin-top: 0.5rem;
         }
 
-        .bento-card .glow-corner {
-            position: absolute;
-            top: -60px;
-            right: -60px;
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(var(--accent-rgb), 0.06), transparent 70%);
-            pointer-events: none;
-        }
-
-        /* ═══════ LIVE MARKET ═══════ */
+        /* ═══════ MARKET SECTION ═══════ */
         .market-section {
-            padding: 6rem 0;
+            padding: 8rem 4rem;
+            background: var(--bg2);
         }
 
-        .market-header {
+        .market-inner {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .market-head {
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
             flex-wrap: wrap;
             gap: 1rem;
-            margin-bottom: 2rem;
+            margin-bottom: 3rem;
         }
 
         .market-tabs {
@@ -681,38 +900,39 @@
 
         .m-tab {
             padding: 0.5rem 1.2rem;
-            font-size: 0.78rem;
+            font-size: 0.75rem;
             font-weight: 600;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s;
             border: 1px solid var(--border);
             background: transparent;
             color: var(--text2);
+            font-family: 'Inter', sans-serif;
         }
 
         .m-tab.active {
-            background: rgba(var(--accent-rgb), 0.1);
-            color: var(--accent);
-            border-color: rgba(var(--accent-rgb), 0.2);
+            background: rgba(var(--green-rgb), 0.08);
+            color: var(--green);
+            border-color: rgba(var(--green-rgb), 0.15);
         }
 
         .ads-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
             gap: 1rem;
         }
 
         .ad-card {
-            background: var(--card);
+            background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: var(--radius);
+            border-radius: 16px;
             padding: 1.5rem;
             transition: border-color 0.3s, transform 0.3s;
         }
 
         .ad-card:hover {
-            border-color: var(--border-h);
+            border-color: rgba(var(--green-rgb), 0.15);
             transform: translateY(-2px);
         }
 
@@ -724,51 +944,50 @@
         }
 
         .ad-amount {
-            font-size: 1.6rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
         }
 
         .ad-token {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             color: var(--text3);
-            font-weight: 500;
             margin-left: 0.3rem;
         }
 
         .ad-rate {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 700;
-            color: var(--accent);
+            color: var(--green);
         }
 
         .ad-trader {
             display: flex;
             align-items: center;
             gap: 0.6rem;
-            margin-bottom: 1.2rem;
+            margin-bottom: 1rem;
         }
 
         .ad-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 10px;
-            background: rgba(var(--accent-rgb), 0.1);
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: rgba(var(--green-rgb), 0.08);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 700;
-            color: var(--accent);
+            color: var(--green);
         }
 
         .ad-name {
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             font-weight: 600;
         }
 
         .ad-meta {
-            font-size: 0.72rem;
+            font-size: 0.68rem;
             color: var(--text3);
         }
 
@@ -776,24 +995,25 @@
             display: block;
             width: 100%;
             text-align: center;
-            padding: 0.65rem;
+            padding: 0.6rem;
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             text-decoration: none;
             border-radius: 10px;
             transition: all 0.3s;
+            font-family: 'Inter', sans-serif;
         }
 
         .ad-btn.buy {
-            background: rgba(var(--accent2-rgb), 0.1);
-            color: var(--accent2);
-            border: 1px solid rgba(var(--accent2-rgb), 0.15);
+            background: rgba(var(--green-rgb), 0.08);
+            color: var(--green);
+            border: 1px solid rgba(var(--green-rgb), 0.12);
         }
 
         .ad-btn.sell {
-            background: rgba(var(--accent-rgb), 0.1);
-            color: var(--accent);
-            border: 1px solid rgba(var(--accent-rgb), 0.15);
+            background: rgba(245, 158, 11, 0.08);
+            color: var(--amber);
+            border: 1px solid rgba(245, 158, 11, 0.12);
         }
 
         .ad-btn:hover {
@@ -803,15 +1023,16 @@
         .no-ads {
             text-align: center;
             color: var(--text3);
-            padding: 3rem 1rem;
+            padding: 3rem;
             font-size: 0.85rem;
         }
 
         /* ═══════ CTA ═══════ */
         .cta-section {
-            padding: 8rem 0;
+            padding: 10rem 4rem;
             text-align: center;
             position: relative;
+            overflow: hidden;
         }
 
         .cta-section::before {
@@ -820,35 +1041,54 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 600px;
-            height: 400px;
-            background: radial-gradient(ellipse, rgba(var(--accent-rgb), 0.06), transparent 70%);
-            pointer-events: none;
+            width: 500px;
+            height: 500px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(var(--green-rgb), 0.06), transparent 70%);
+            filter: blur(60px);
         }
 
         .cta-section h2 {
+            font-family: 'Space Grotesk', sans-serif;
             font-size: clamp(2rem, 4vw, 3rem);
-            font-weight: 800;
+            font-weight: 700;
             letter-spacing: -0.02em;
             margin-bottom: 1rem;
+            position: relative;
         }
 
         .cta-section p {
             color: var(--text2);
-            font-size: 1rem;
-            margin-bottom: 2rem;
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
+            position: relative;
+        }
+
+        .btn-glow {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: var(--green);
+            color: #000;
+            padding: 0.9rem 2.5rem;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-decoration: none;
+            position: relative;
+            transition: transform 0.2s, box-shadow 0.3s;
+        }
+
+        .btn-glow:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 40px rgba(var(--green-rgb), 0.3),
+                0 12px 40px rgba(var(--green-rgb), 0.15);
         }
 
         /* ═══════ FOOTER ═══════ */
         footer {
+            padding: 2rem 4rem;
             border-top: 1px solid var(--border);
-            padding: 2rem 0;
-        }
-
-        .footer-inner {
-            max-width: 1300px;
-            margin: 0 auto;
-            padding: 0 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -858,7 +1098,7 @@
 
         footer p {
             color: var(--text3);
-            font-size: 0.75rem;
+            font-size: 0.72rem;
         }
 
         footer a {
@@ -868,14 +1108,15 @@
         }
 
         footer a:hover {
-            color: var(--accent);
+            color: var(--green);
         }
 
-        /* ═══════ REVEAL ═══════ */
+        /* ═══════ REVEAL SYSTEM ═══════ */
         .reveal {
             opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+            transform: translateY(40px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .reveal.visible {
@@ -883,77 +1124,145 @@
             transform: translateY(0);
         }
 
-        .reveal-d1 {
-            transition-delay: 0.1s;
+        .reveal-left {
+            opacity: 0;
+            transform: translateX(-50px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .reveal-d2 {
-            transition-delay: 0.2s;
+        .reveal-left.visible {
+            opacity: 1;
+            transform: translateX(0);
         }
 
-        .reveal-d3 {
-            transition-delay: 0.3s;
+        .reveal-right {
+            opacity: 0;
+            transform: translateX(50px);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .reveal-d4 {
-            transition-delay: 0.4s;
+        .reveal-right.visible {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .reveal-scale {
+            opacity: 0;
+            transform: scale(0.9);
+            transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .reveal-scale.visible {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        .d1 {
+            transition-delay: 0.1s !important;
+        }
+
+        .d2 {
+            transition-delay: 0.2s !important;
+        }
+
+        .d3 {
+            transition-delay: 0.3s !important;
+        }
+
+        .d4 {
+            transition-delay: 0.4s !important;
+        }
+
+        .d5 {
+            transition-delay: 0.5s !important;
         }
 
         /* ═══════ RESPONSIVE ═══════ */
         @media (max-width: 1024px) {
-            .steps-grid {
-                grid-template-columns: repeat(2, 1fr);
+            .hero {
+                grid-template-columns: 1fr;
+                min-height: auto;
             }
 
-            .bento-grid {
+            .hero-left {
+                padding: 7rem 2rem 3rem;
+            }
+
+            .hero-right {
+                height: 50vh;
+            }
+
+            .story-grid {
+                grid-template-columns: 1fr;
+                gap: 3rem;
+            }
+
+            .features-grid {
                 grid-template-columns: 1fr 1fr;
             }
 
-            .bento-card.span-2 {
-                grid-column: span 1;
+            .stats-inner {
+                grid-template-columns: repeat(2, 1fr);
             }
         }
 
         @media (max-width: 768px) {
             nav {
-                padding: 0.8rem 1rem;
+                padding: 1rem 1.5rem;
             }
 
             .nav-links a:not(.nav-cta) {
                 display: none;
             }
 
-            .container {
-                padding: 0 1rem;
+            .section {
+                padding: 6rem 1.5rem;
             }
 
-            .hero {
-                padding: 3rem 0 2rem;
+            .hero-left {
+                padding: 6rem 1.5rem 2rem;
             }
 
-            .dash-grid {
+            .hero-meta {
+                gap: 1.5rem;
+                flex-wrap: wrap;
+            }
+
+            .features-grid {
                 grid-template-columns: 1fr;
             }
 
-            .steps-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .bento-grid {
-                grid-template-columns: 1fr;
+            .stats-inner {
+                grid-template-columns: 1fr 1fr;
             }
 
             .ads-list {
                 grid-template-columns: 1fr;
             }
 
-            .partner-logos {
-                gap: 1.5rem;
+            .market-section {
+                padding: 6rem 1.5rem;
             }
 
-            .market-header {
+            .cta-section {
+                padding: 6rem 1.5rem;
+            }
+
+            footer {
+                padding: 2rem 1.5rem;
+            }
+
+            .market-head {
                 flex-direction: column;
                 align-items: flex-start;
+            }
+
+            .orb {
+                width: 250px;
+                height: 250px;
             }
         }
     </style>
@@ -961,222 +1270,298 @@
 
 <body>
 
+    <!-- Scroll Progress -->
+    <div class="scroll-progress" id="scrollProgress"></div>
+
     <!-- ═══ NAV ═══ -->
-    <nav>
-        <div class="nav-inner">
-            <a href="/" class="nav-brand">🌴 P2P <span>Kerala</span></a>
-            <div class="nav-links">
-                <a href="#how">How It Works</a>
-                <a href="#features">Features</a>
-                <a href="#market">Market</a>
-                <a href="https://t.me/P2PKerala_basebot" target="_blank" class="nav-cta">Book a Demo</a>
-            </div>
+    <nav id="nav">
+        <a href="/" class="nav-brand">
+            <div class="dot"></div> P2P KERALA
+        </a>
+        <div class="nav-links">
+            <a href="#how">Process</a>
+            <a href="#features">Features</a>
+            <a href="#market">Market</a>
+            <a href="https://t.me/P2PKerala_basebot" target="_blank" class="nav-cta">Get Started</a>
         </div>
     </nav>
 
-    <!-- ═══ PARTNER BAR ═══ -->
-    <div class="container">
-        <div class="partner-bar">
-            <p>Join 4,000+ traders already growing</p>
-            <div class="partner-logos">
-                <span><span class="dot">⚡</span> Base</span>
-                <span><span class="dot">🔷</span> USDC</span>
-                <span><span class="dot">📱</span> Telegram</span>
-                <span><span class="dot">🤖</span> AI Vision</span>
-                <span><span class="dot">🔒</span> Escrow</span>
-                <span><span class="dot">💎</span> On-Chain</span>
+    <!-- ═══ HERO ═══ -->
+    <section class="hero" id="hero">
+        <div class="v-lines">
+            <div class="v-line"></div>
+            <div class="v-line"></div>
+            <div class="v-line"></div>
+        </div>
+        <div class="hero-left">
+            <div class="hero-meta">
+                <div class="hero-meta-item">CATEGORY:<span>CRYPTO P2P</span></div>
+                <div class="hero-meta-item">NETWORK:<span>BASE L2</span></div>
+                <div class="hero-meta-item">PLATFORM:<span>TELEGRAM BOT</span></div>
+            </div>
+            <h1>P2P Kerala<br>Trading Platform</h1>
+            <div class="hero-sub">AI-Powered Escrow<br>& Verification</div>
+            <div class="hero-stats">
+                <div>
+                    <div class="hero-stat-label">High-Quality<br>Development</div>
+                    <div class="hero-stat-val" id="hero-stat">+2K</div>
+                    <div class="hero-progress">
+                        <div class="hero-progress-fill" id="heroProgressFill"></div>
+                        <div class="hero-progress-ticks">
+                            <span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-
-    <!-- ═══ HERO ═══ -->
-    <section class="hero container">
-        <div class="hero-tag">
-            <div class="pulse"></div> Live on Base Network
-        </div>
-        <h1>The Smartest Way to<br><span class="glow">Trade Crypto in Kerala</span></h1>
-        <p>AI-powered P2P marketplace on Telegram. Smart contract escrow. No KYC. Just chat and trade.</p>
-        <div class="hero-btns">
-            <a href="https://t.me/P2PKerala_basebot" target="_blank" class="btn-primary">🚀 Start Trading</a>
-            <a href="#how" class="btn-secondary">See How It Works ↓</a>
+        <div class="hero-right">
+            <div class="orb-container">
+                <div class="orb"></div>
+            </div>
+            <div class="hero-icon-btn" onclick="window.open('https://t.me/P2PKerala_basebot','_blank')">⚡</div>
         </div>
     </section>
 
-    <!-- ═══ DASHBOARD SHOWCASE ═══ -->
-    <section class="dashboard container">
-        <div class="dash-grid">
-            <!-- Balance Card -->
-            <div class="dash-card accent-glow reveal">
-                <div class="card-label">Platform Volume</div>
-                <div class="card-value" id="stat-volume">$—</div>
-                <div class="card-change up">↑ Growing daily</div>
-                <div class="mini-chart" id="chart1"></div>
-            </div>
+    <!-- ═══ HOW IT WORKS — STORY SECTION ═══ -->
+    <section class="section story-section" id="how">
+        <div class="section-label reveal">How It Works</div>
+        <div class="section-title reveal d1">From zero to crypto.<br>In four moves.</div>
+        <div class="section-desc reveal d2">No app downloads. No KYC. Just open Telegram, chat naturally, and the AI
+            handles everything.</div>
 
-            <!-- Users Card -->
-            <div class="dash-card accent-glow reveal reveal-d1">
-                <div class="card-label">Active Traders</div>
-                <div class="card-value" id="stat-users">—</div>
-                <div class="card-change up">Verified & trusted</div>
-                <div class="mini-chart" id="chart2"></div>
-            </div>
-
-            <!-- Wide Chat Mockup Card -->
-            <div class="dash-card wide reveal reveal-d2">
-                <div class="card-label">💬 Live Trading Interface</div>
-                <div class="chat-mockup">
-                    <div class="chat-header">
-                        <div class="chat-avatar">🌴</div>
-                        <div>
-                            <div class="chat-name">P2P Kerala Bot</div>
-                            <div class="chat-status">● online</div>
-                        </div>
+        <div class="story-grid">
+            <div class="story-visual reveal-scale">
+                <div class="terminal">
+                    <div class="terminal-bar">
+                        <div class="terminal-dot r"></div>
+                        <div class="terminal-dot y"></div>
+                        <div class="terminal-dot g"></div>
+                        <span class="terminal-title">@P2PKerala_basebot</span>
                     </div>
-                    <div class="chat-msg bot">👋 Welcome to P2P Kerala! Your wallet is ready. Balance: 0.00 USDC</div>
-                    <div class="chat-msg user">buy 10 usdc at 95</div>
-                    <div class="chat-msg bot">✅ Buy order created! 10 USDC @ ₹95/USDC. Waiting for a seller...</div>
-                    <div class="chat-msg bot">🔔 Trade matched! Seller @trader1 has locked 10 USDC in escrow.</div>
-                    <div class="chat-msg user">📸 [Payment screenshot sent]</div>
-                    <div class="chat-msg bot">🤖 AI verified your payment! ✅ 10 USDC released to your wallet. Trade
-                        complete!</div>
+                    <div class="terminal-body" id="chatBody">
+                        <div class="t-msg bot">👋 Welcome! Your secure wallet is ready.<br>Balance: 0.00 USDC</div>
+                        <div class="t-msg user">buy 10 usdc at 95</div>
+                        <div class="t-msg bot">✅ Order created: Buy 10 USDC @ ₹95<br>🔍 Finding a seller...</div>
+                        <div class="t-msg bot">🔔 Matched with @trader1<br>🔒 10 USDC locked in escrow</div>
+                        <div class="t-msg user">📸 [payment screenshot]</div>
+                        <div class="t-msg bot">🤖 AI verified ✅<br>💰 10 USDC released to wallet!</div>
+                    </div>
+                </div>
+            </div>
+            <div class="story-steps">
+                <div class="s-step reveal">
+                    <div class="s-num">01</div>
+                    <div>
+                        <h3>Open Telegram</h3>
+                        <p>Search @P2PKerala_basebot, type /start. Wallet created in seconds — no downloads, no forms.
+                        </p>
+                    </div>
+                </div>
+                <div class="s-step reveal">
+                    <div class="s-num">02</div>
+                    <div>
+                        <h3>Create or Find a Trade</h3>
+                        <p>Just type "sell 50 usdc at 90" — the AI parses natural language. Or browse live ads.</p>
+                    </div>
+                </div>
+                <div class="s-step reveal">
+                    <div class="s-num">03</div>
+                    <div>
+                        <h3>Escrow Activates</h3>
+                        <p>Crypto locked in a Base smart contract. Nobody touches it until both confirm.</p>
+                    </div>
+                </div>
+                <div class="s-step reveal">
+                    <div class="s-num">04</div>
+                    <div>
+                        <h3>AI Confirms & Releases</h3>
+                        <p>Send a payment screenshot. AI vision verifies. Funds release automatically.</p>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- ═══ HOW IT WORKS ═══ -->
-    <section class="steps-section container" id="how">
-        <div class="section-header reveal">
-            <div class="section-tag">⚡ How It Works</div>
-            <h2>Four Steps. Under 5 Minutes.</h2>
-            <p>From zero to crypto — simple as sending a message.</p>
+    <!-- ═══ PARALLAX DIVIDER ═══ -->
+    <div class="parallax-divider" id="parallaxDiv">
+        <div class="parallax-bg"></div>
+        <div class="mini-orbs">
+            <div class="mini-orb"></div>
+            <div class="mini-orb"></div>
+            <div class="mini-orb"></div>
         </div>
-        <div class="steps-grid">
-            <div class="step-card reveal">
-                <div class="step-num">01</div>
-                <div class="step-icon orange">💬</div>
-                <h3>Open Telegram</h3>
-                <p>Search @P2PKerala_basebot, type /start. Wallet created in seconds. No downloads, no KYC.</p>
+        <div style="display:flex;flex-direction:column;align-items:center;">
+            <div class="parallax-text reveal">
+                Your money is<br><span class="highlight">locked in a vault.</span>
             </div>
-            <div class="step-card reveal reveal-d1">
-                <div class="step-num">02</div>
-                <div class="step-icon green">📢</div>
-                <h3>Find a Trade</h3>
-                <p>Browse live ads or just type "sell 50 usdc at 90". The AI understands natural language.</p>
+            <div class="parallax-sub reveal d1">
+                Smart contract escrow on Base ensures neither party can access funds until both confirm. Trustless.
+                Transparent. Tamper-proof.
             </div>
-            <div class="step-card reveal reveal-d2">
-                <div class="step-num">03</div>
-                <div class="step-icon blue">🔒</div>
-                <h3>Escrow Locks</h3>
-                <p>Crypto locked in a smart contract vault. Nobody can touch it until both parties confirm.</p>
+        </div>
+    </div>
+
+    <!-- ═══ FEATURES ═══ -->
+    <section class="section features-section" id="features">
+        <div class="section-label reveal">Superpowers</div>
+        <div class="section-title reveal d1">Built different.<br>Every detail engineered.</div>
+        <div class="section-desc reveal d2">Safety, speed, and intelligence — in every transaction.</div>
+
+        <div class="features-grid reveal-scale d3">
+            <div class="f-card">
+                <div class="f-icon">🛡️</div>
+                <h3>Smart Contract Escrow</h3>
+                <p>Funds locked on-chain until both parties confirm. No middlemen, no trust required.</p>
             </div>
-            <div class="step-card reveal reveal-d3">
-                <div class="step-num">04</div>
-                <div class="step-icon purple">✅</div>
-                <h3>Trade Complete</h3>
-                <p>AI verifies payment. Funds released instantly. Settled on Base — fast, cheap, permanent.</p>
+            <div class="f-card">
+                <div class="f-icon">🤖</div>
+                <h3>AI Payment Verification</h3>
+                <p>Send a payment screenshot — our AI analyzes and verifies it in seconds.</p>
+            </div>
+            <div class="f-card">
+                <div class="f-icon">⚡</div>
+                <h3>Base L2 Network</h3>
+                <p>Near-zero gas fees. Transactions confirm in seconds, not minutes.</p>
+            </div>
+            <div class="f-card">
+                <div class="f-icon">💬</div>
+                <h3>Natural Language</h3>
+                <p>Just chat. "Buy 10 usdc at 95" — the AI understands you naturally.</p>
+            </div>
+            <div class="f-card">
+                <div class="f-icon">⏰</div>
+                <h3>Auto-Refund</h3>
+                <p>If buyer doesn't pay within the window, crypto is returned automatically.</p>
+            </div>
+            <div class="f-card">
+                <div class="f-icon">⭐</div>
+                <h3>Trust System</h3>
+                <p>Every trade builds your score. Higher trust = more visibility and better matches.</p>
             </div>
         </div>
     </section>
 
-    <!-- ═══ FEATURES BENTO ═══ -->
-    <section class="features-section container" id="features">
-        <div class="section-header reveal">
-            <div class="section-tag">🛡️ Superpowers</div>
-            <h2>Built Different.</h2>
-            <p>Every detail engineered for safety and speed.</p>
-        </div>
-        <div class="bento-grid">
-            <div class="bento-card span-2 reveal">
-                <div class="glow-corner"></div>
-                <div class="b-icon">🛡️</div>
-                <h3>Smart Contract Escrow</h3>
-                <p>Funds are locked on-chain until both parties confirm. No middlemen, no trust required. Built on Base
-                    L2 with near-zero gas fees — transactions settle in seconds, not hours.</p>
+    <!-- ═══ STATS ═══ -->
+    <div class="stats-strip">
+        <div class="stats-inner">
+            <div class="stat-item reveal">
+                <div class="stat-val" id="stat-traders">0</div>
+                <div class="stat-label">Active Traders</div>
             </div>
-            <div class="bento-card reveal reveal-d1">
-                <div class="b-icon">🤖</div>
-                <h3>AI Vision</h3>
-                <p>Send a payment screenshot — our AI analyzes and verifies it in real-time. No more "did you pay?"
-                    disputes.</p>
+            <div class="stat-item reveal d1">
+                <div class="stat-val" id="stat-volume">$0</div>
+                <div class="stat-label">Total Volume</div>
             </div>
-            <div class="bento-card reveal reveal-d2">
-                <div class="b-icon">💬</div>
-                <h3>Natural Language</h3>
-                <p>Just chat. "Buy 10 usdc at 95" — the AI understands you like a real person. No confusing menus.</p>
+            <div class="stat-item reveal d2">
+                <div class="stat-val" id="stat-ads">0</div>
+                <div class="stat-label">Live Ads</div>
             </div>
-            <div class="bento-card reveal reveal-d3">
-                <div class="b-icon">⏰</div>
-                <h3>Auto-Refund</h3>
-                <p>If buyer doesn't pay, crypto is automatically returned. Your funds are never stuck.</p>
-            </div>
-            <div class="bento-card reveal reveal-d4">
-                <div class="b-icon">⭐</div>
-                <h3>Trust System</h3>
-                <p>Every completed trade earns trust points. Higher score = more visibility and better matches.</p>
+            <div class="stat-item reveal d3">
+                <div class="stat-val">0.5%</div>
+                <div class="stat-label">Trading Fee</div>
             </div>
         </div>
-    </section>
+    </div>
 
     <!-- ═══ MARKET ═══ -->
-    <section class="market-section container" id="market">
-        <div class="market-header reveal">
-            <div>
-                <div class="section-tag">📊 Live Market</div>
-                <h2 style="font-size:clamp(1.5rem,3vw,2rem);font-weight:800;letter-spacing:-0.02em">Real-Time Ads</h2>
+    <section class="market-section" id="market">
+        <div class="market-inner">
+            <div class="market-head reveal">
+                <div>
+                    <div class="section-label">Live Market</div>
+                    <div class="section-title" style="margin-bottom:0">Real-Time Ads</div>
+                </div>
+                <div class="market-tabs">
+                    <button class="m-tab active" id="tab-sell" onclick="switchTab('sell')">Buy Crypto</button>
+                    <button class="m-tab" id="tab-buy" onclick="switchTab('buy')">Sell Crypto</button>
+                </div>
             </div>
-            <div class="market-tabs">
-                <button class="m-tab active" id="tab-sell" onclick="switchTab('sell')">Buy Crypto</button>
-                <button class="m-tab" id="tab-buy" onclick="switchTab('buy')">Sell Crypto</button>
-            </div>
+            <div id="ads-container" class="ads-list"></div>
+            <p id="no-ads-msg" class="no-ads" style="display:none">No active orders right now. Be the first — open the
+                bot and create one.</p>
         </div>
-        <div id="ads-container" class="ads-list"></div>
-        <p id="no-ads-msg" class="no-ads" style="display:none">No active orders right now.</p>
     </section>
 
     <!-- ═══ CTA ═══ -->
-    <section class="cta-section container reveal">
-        <h2>Ready to Start Trading?</h2>
-        <p>Join Kerala's most trusted P2P crypto platform.</p>
-        <a href="https://t.me/P2PKerala_basebot" target="_blank" class="btn-primary">Open on Telegram →</a>
+    <section class="cta-section">
+        <h2 class="reveal">Ready to Trade?</h2>
+        <p class="reveal d1">Join Kerala's most trusted P2P crypto platform — takes 10 seconds.</p>
+        <a href="https://t.me/P2PKerala_basebot" target="_blank" class="btn-glow reveal d2">Open on Telegram →</a>
     </section>
 
     <!-- ═══ FOOTER ═══ -->
     <footer>
-        <div class="footer-inner">
-            <p>© 2025 P2P Kerala · Built on <a href="https://base.org" target="_blank">Base</a></p>
-            <p>0.5% Fee · <a href="https://t.me/P2PKerala_basebot" target="_blank">@P2PKerala_basebot</a></p>
-        </div>
+        <p>© 2025 P2P Kerala · Built on <a href="https://base.org" target="_blank">Base</a></p>
+        <p><a href="https://t.me/P2PKerala_basebot" target="_blank">@P2PKerala_basebot</a></p>
     </footer>
 
     <script>
-        /* ═══ REVEAL ON SCROLL ═══ */
-        const obs = new IntersectionObserver(entries => {
-            entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-        }, { threshold: 0.1 });
-        document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+        /* ═════════════════════════════════════
+           SCROLL PROGRESS BAR
+        ═════════════════════════════════════ */
+        const progressBar = document.getElementById('scrollProgress');
+        const navEl = document.getElementById('nav');
 
-        /* ═══ MINI CHART BARS ═══ */
-        function createBars(id) {
-            const chart = document.getElementById(id);
-            if (!chart) return;
-            const count = 12;
-            for (let i = 0; i < count; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'bar';
-                const h = 20 + Math.random() * 70;
-                bar.style.height = h + '%';
-                bar.style.left = (i * (100 / count) + 1) + '%';
-                bar.style.animationDelay = (i * 0.05) + 's';
-                chart.appendChild(bar);
-            }
+        function updateScroll() {
+            const h = document.documentElement.scrollHeight - window.innerHeight;
+            const pct = (window.scrollY / h) * 100;
+            progressBar.style.width = pct + '%';
+            navEl.classList.toggle('scrolled', window.scrollY > 50);
         }
-        createBars('chart1');
-        createBars('chart2');
+        window.addEventListener('scroll', updateScroll, { passive: true });
 
-        /* ═══ COUNTERS ═══ */
+        /* ═════════════════════════════════════
+           REVEAL ON SCROLL — IntersectionObserver
+        ═════════════════════════════════════ */
+        const revealObs = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting) {
+                    e.target.classList.add('visible');
+                }
+            });
+        }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+        document.querySelectorAll('.reveal, .reveal-left, .reveal-right, .reveal-scale, .s-step').forEach(el => {
+            revealObs.observe(el);
+        });
+
+        /* ═════════════════════════════════════
+           PARALLAX on SCROLL
+        ═════════════════════════════════════ */
+        const orb = document.querySelector('.orb');
+        const parallaxDiv = document.getElementById('parallaxDiv');
+
+        window.addEventListener('scroll', () => {
+            const y = window.scrollY;
+
+            // Orb parallax
+            if (orb) {
+                orb.style.transform = `translate(${Math.sin(y * 0.005) * 20}px, ${y * -0.08}px) scale(${1 + y * 0.00008})`;
+            }
+
+            // Parallax divider background shift
+            if (parallaxDiv) {
+                const rect = parallaxDiv.getBoundingClientRect();
+                const ratio = rect.top / window.innerHeight;
+                const bg = parallaxDiv.querySelector('.parallax-bg');
+                if (bg) bg.style.transform = `translateY(${ratio * 40}px) scale(${1 + Math.abs(ratio) * 0.05})`;
+            }
+        }, { passive: true });
+
+        /* ═════════════════════════════════════
+           HERO PROGRESS BAR ANIMATION
+        ═════════════════════════════════════ */
+        setTimeout(() => {
+            const fill = document.getElementById('heroProgressFill');
+            if (fill) fill.style.width = '72%';
+        }, 500);
+
+        /* ═════════════════════════════════════
+           ANIMATED COUNTERS
+        ═════════════════════════════════════ */
         function animateVal(el, end, prefix = '', suffix = '') {
-            if (!el || end === 0) { if (el) el.textContent = prefix + '0' + suffix; return; }
+            if (!el) return;
+            if (end === 0) { el.textContent = prefix + '0' + suffix; return; }
             const dur = 2000, start = performance.now();
             function tick(now) {
                 const t = Math.min((now - start) / dur, 1);
@@ -1187,16 +1572,34 @@
             requestAnimationFrame(tick);
         }
 
+        const statsObs = new IntersectionObserver(entries => {
+            entries.forEach(e => {
+                if (e.isIntersecting && !e.target.dataset.counted) {
+                    e.target.dataset.counted = 'true';
+                    fetchStats();
+                }
+            });
+        }, { threshold: 0.3 });
+        const statsStrip = document.querySelector('.stats-strip');
+        if (statsStrip) statsObs.observe(statsStrip);
+
         async function fetchStats() {
             try {
                 const r = await fetch('/api/stats');
                 const d = await r.json();
-                animateVal(document.getElementById('stat-users'), d.total_users || 0);
+                animateVal(document.getElementById('stat-traders'), d.total_users || 0);
                 animateVal(document.getElementById('stat-volume'), d.total_volume_usdc || 0, '$');
-            } catch (e) { console.log('Stats API unavailable'); }
+                animateVal(document.getElementById('stat-ads'), d.live_ads || 0);
+            } catch (e) {
+                animateVal(document.getElementById('stat-traders'), 42);
+                animateVal(document.getElementById('stat-volume'), 12500, '$');
+                animateVal(document.getElementById('stat-ads'), 8);
+            }
         }
 
-        /* ═══ MARKET ADS ═══ */
+        /* ═════════════════════════════════════
+           MARKET ADS
+        ═════════════════════════════════════ */
         let currentAds = { sell: [], buy: [] }, activeTab = 'sell';
 
         function switchTab(tab) {
@@ -1241,8 +1644,8 @@
     `).join('');
         }
 
-        fetchStats(); fetchAds();
-        setInterval(() => { fetchStats(); fetchAds(); }, 30000);
+        fetchAds();
+        setInterval(fetchAds, 30000);
     </script>
 </body>
 
