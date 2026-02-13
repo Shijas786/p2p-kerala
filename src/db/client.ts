@@ -7,10 +7,10 @@ class Database {
 
     private getClient(): SupabaseClient {
         if (!this.client) {
-            if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+            if (!env.SUPABASE_URL || (!env.SUPABASE_SERVICE_KEY && !env.SUPABASE_ANON_KEY)) {
                 throw new Error("Supabase credentials not configured");
             }
-            this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY);
+            this.client = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY);
         }
         return this.client;
     }
