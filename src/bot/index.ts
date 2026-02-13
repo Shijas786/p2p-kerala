@@ -1133,6 +1133,98 @@ bot.on("callback_query:data", async (ctx) => {
         await ctx.answerCallbackQuery();
     }
 
+    // Handle AI-generated Sell Order confirmation
+    if (data.startsWith("create_sell:")) {
+        console.log("DEBUG: create_sell callback received:", data);
+        try {
+            const parts = data.split(":");
+            if (parts.length < 3) throw new Error("Invalid callback data format");
+
+            const amountStr = parts[1];
+            const rateStr = parts[2];
+            const amount = parseFloat(amountStr);
+            const rate = parseFloat(rateStr);
+
+            if (isNaN(amount) || isNaN(rate)) {
+                throw new Error(`Invalid amount or rate: ${amountStr}, ${rateStr}`);
+            }
+
+            ctx.session.ad_draft = {
+                type: "sell",
+                amount: amount,
+                rate: rate,
+                token: "USDC"
+            };
+
+            const keyboard = new InlineKeyboard()
+                .text("⚡ UPI", "ad_pay:upi")
+                .text("🏦 Bank Transfer", "ad_pay:bank")
+                .text("💳 All Methods", "ad_pay:all");
+
+            const text = [
+                "📢 *Create Sell Ad — Step 3/3*",
+                "",
+                `Amount: *${formatUSDC(amount)}*`,
+                `Rate: *${formatINR(rate)}/USDC*`,
+                "",
+                "How do you want to receive payment?",
+            ].join("\n");
+
+            console.log("DEBUG: Editing message to Step 3/3");
+            await ctx.editMessageText(text, { parse_mode: "Markdown", reply_markup: keyboard });
+            await ctx.answerCallbackQuery();
+        } catch (err: any) {
+            console.error("DEBUG: Error in create_sell handler:", err);
+            await ctx.answerCallbackQuery({ text: "❌ Error: " + err.message, show_alert: true });
+        }
+    }
+
+    // Handle AI-generated Buy Order confirmation
+    if (data.startsWith("create_buy:")) {
+        console.log("DEBUG: create_buy callback received:", data);
+        try {
+            const parts = data.split(":");
+            if (parts.length < 3) throw new Error("Invalid callback data format");
+
+            const amountStr = parts[1];
+            const rateStr = parts[2];
+            const amount = parseFloat(amountStr);
+            const rate = parseFloat(rateStr);
+
+            if (isNaN(amount) || isNaN(rate)) {
+                throw new Error(`Invalid amount or rate: ${amountStr}, ${rateStr}`);
+            }
+
+            ctx.session.ad_draft = {
+                type: "buy",
+                amount: amount,
+                rate: rate,
+                token: "USDC"
+            };
+
+            const keyboard = new InlineKeyboard()
+                .text("⚡ UPI", "ad_pay:upi")
+                .text("🏦 Bank Transfer", "ad_pay:bank")
+                .text("💳 All Methods", "ad_pay:all");
+
+            const text = [
+                "📢 *Create Buy Ad — Step 3/3*",
+                "",
+                `Amount: *${formatUSDC(amount)}*`,
+                `Rate: *${formatINR(rate)}/USDC*`,
+                "",
+                "How do you want to pay the seller?",
+            ].join("\n");
+
+            console.log("DEBUG: Editing message to Step 3/3");
+            await ctx.editMessageText(text, { parse_mode: "Markdown", reply_markup: keyboard });
+            await ctx.answerCallbackQuery();
+        } catch (err: any) {
+            console.error("DEBUG: Error in create_buy handler:", err);
+            await ctx.answerCallbackQuery({ text: "❌ Error: " + err.message, show_alert: true });
+        }
+    }
+
     // Handle Send Token Selection -> Ask Address
     if (data.startsWith("send_token:")) {
         const token = data.replace("send_token:", "");
@@ -1677,15 +1769,11 @@ bot.on("callback_query:data", async (ctx) => {
                 await ctx.editMessageText("⏳ Initiating trade... checking seller balance.");
 
                 // 1. Double check seller still has the tokens in their bot wallet (Safety against drains)
+                // NOTE: For Sell Ads, funds were already moved to the relayer during creation. 
+                // The check below is only needed if we support "Direct" ads where funds are not pre-escrowed.
+                // For now, in P2PKerala, sell ads are pre-funded.
                 const seller = await db.getUserById(order.user_id);
                 if (!seller || !seller.wallet_address) throw new Error("Seller wallet not found.");
-
-                const sellerBalance = await escrow.getBalance(seller.wallet_address);
-                if (parseFloat(sellerBalance) < order.amount) {
-                    await db.updateOrder(order.id, { status: "paused" });
-                    await ctx.editMessageText("❌ Trade failed: Seller no longer has sufficient balance. Ad has been paused.");
-                    return;
-                }
 
                 // 2. Atomic fill check (Race condition protection)
                 const filled = await db.fillOrder(order.id, order.amount);
@@ -1699,45 +1787,52 @@ bot.on("callback_query:data", async (ctx) => {
                 const tokenSymbol = order.token || "USDC";
                 const tokenAddress = tokenSymbol === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS;
 
-                // 3. Relayer creates trade on Smart Contract
-                const { txHash, tradeId } = await wallet.relayerCreateTrade(
-                    user.wallet_address!, // Buyer address
-                    order.amount,
-                    tokenAddress
-                );
-
-                // 4. Create local Trade record
-                const trade = await db.createTrade({
-                    order_id: order.id,
-                    buyer_id: user.id,
-                    seller_id: order.user_id,
-                    token: tokenSymbol,
-                    chain: "base",
-                    amount: order.amount,
-                    rate: order.rate,
-                    fiat_amount: order.amount * order.rate,
-                    fiat_currency: "INR",
-                    fee_amount: order.amount * env.FEE_PERCENTAGE,
-                    fee_percentage: env.FEE_PERCENTAGE,
-                    buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
-                    payment_method: "UPI",
-                    status: "in_escrow",
-                    on_chain_trade_id: tradeId,
-                    escrow_tx_hash: txHash,
-                    created_at: new Date().toISOString(),
-                });
-
-                await ctx.editMessageText(
-                    `✅ Trade Started! Trade #${tradeId}\nCheck /mytrades to proceed with payment.`
-                );
-
-                // Notify Seller
-                if (seller.telegram_id) {
-                    await ctx.api.sendMessage(
-                        seller.telegram_id,
-                        `🔔 *New Trade Started!*\n\nBuyer matches your ad for ${formatUSDC(order.amount, order.token)}.\nThey will send payment soon.\n\nCheck /mytrades to monitor status.`,
-                        { parse_mode: "Markdown" }
+                try {
+                    // 3. Relayer creates trade on Smart Contract
+                    const { txHash, tradeId } = await wallet.relayerCreateTrade(
+                        user.wallet_address!, // Buyer address
+                        order.amount,
+                        tokenAddress
                     );
+
+                    // 4. Create local Trade record
+                    const trade = await db.createTrade({
+                        order_id: order.id,
+                        buyer_id: user.id,
+                        seller_id: order.user_id,
+                        token: tokenSymbol,
+                        chain: "base",
+                        amount: order.amount,
+                        rate: order.rate,
+                        fiat_amount: order.amount * order.rate,
+                        fiat_currency: "INR",
+                        fee_amount: order.amount * env.FEE_PERCENTAGE,
+                        fee_percentage: env.FEE_PERCENTAGE,
+                        buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
+                        payment_method: "UPI",
+                        status: "in_escrow",
+                        on_chain_trade_id: tradeId,
+                        escrow_tx_hash: txHash,
+                        created_at: new Date().toISOString(),
+                    });
+
+                    await ctx.editMessageText(
+                        `✅ Trade Started! Trade #${tradeId}\nCheck /mytrades to proceed with payment.`
+                    );
+
+                    // Notify Seller
+                    if (seller.telegram_id) {
+                        await ctx.api.sendMessage(
+                            seller.telegram_id,
+                            `🔔 *New Trade Started!*\n\nBuyer matches your ad for ${formatUSDC(order.amount, order.token)}.\nThey will send payment soon.\n\nCheck /mytrades to monitor status.`,
+                            { parse_mode: "Markdown" }
+                        );
+                    }
+                } catch (blockchainError: any) {
+                    console.error("Blockchain error during trade creation:", blockchainError);
+                    // Critical: Revert the fill so the ad remains active!
+                    await db.revertFillOrder(order.id, order.amount);
+                    await ctx.editMessageText(`❌ Trade initiation failed: ${blockchainError.message || "Blockchain error"}. Ad has been restored to active.`);
                 }
             } else {
                 // ═══ TAKER IS SELLING (Filling a Buy Order) ═══
@@ -1762,60 +1857,60 @@ bot.on("callback_query:data", async (ctx) => {
 
                 await ctx.editMessageText(`⏳ Locking ${tokenSymbol} in escrow...`);
 
-                // 2. Seller sends tokens to Relayer (Admin Wallet)
-                // We use Relayer as an intermediate because Users can't call 'createTrade' directly (gasless exp)
-                // Relayer needs to hold the tokens to call 'createTrade'.
-                const relayerAddress = await wallet.getRelayerAddress();
+                try {
+                    // 2. Seller sends tokens to Relayer (Admin Wallet)
+                    const relayerAddress = await wallet.getRelayerAddress();
+                    const sellerTransferTx = await wallet.sendToken(seller.wallet_index, relayerAddress, totalRequired, tokenAddress);
 
-                // Transfer TOTAL (Amount + Fee) from User -> Relayer
-                await wallet.sendToken(seller.wallet_index, relayerAddress, totalRequired, tokenAddress);
+                    // 3. Relayer creates Trade on Smart Contract
+                    const buyerUser = await db.getUserById(order.user_id);
 
-                // 3. Relayer creates Trade on Smart Contract
-                // Buyer = order.user_id (The one who created the Buy Ad)
-                // Seller = seller (Me)
-                const buyerUser = await db.getUserById(order.user_id);
-
-                const { txHash, tradeId } = await wallet.relayerCreateTrade(
-                    buyerUser!.wallet_address!,
-                    order.amount,
-                    tokenAddress
-                );
-
-                // 4. Create Trade Record
-                const trade = await db.createTrade({
-                    order_id: order.id,
-                    buyer_id: order.user_id, // Maker (Buyer)
-                    seller_id: seller.id,    // Taker (Seller)
-                    token: tokenSymbol,
-                    chain: "base",
-                    amount: order.amount,
-                    rate: order.rate,
-                    fiat_amount: order.amount * order.rate,
-                    fiat_currency: "INR",
-                    fee_amount: order.amount * env.FEE_PERCENTAGE,
-                    fee_percentage: env.FEE_PERCENTAGE,
-                    buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
-                    payment_method: "UPI", // Should be selected? Defaulting for now.
-                    status: "in_escrow",
-                    on_chain_trade_id: tradeId,
-                    escrow_tx_hash: txHash,
-                    created_at: new Date().toISOString(),
-                });
-
-                // 5. Mark Order as Filled
-                await db.updateOrder(order.id, { status: "filled", filled_amount: order.amount });
-
-                await ctx.editMessageText(
-                    `✅ Trade Started! Trade #${tradeId}\nWaiting for Buyer to pay.\nCheck /mytrades.`
-                );
-
-                // Notify Buyer (Maker)
-                if (buyerUser && buyerUser.telegram_id) {
-                    await ctx.api.sendMessage(
-                        buyerUser.telegram_id,
-                        `🔔 *Trade Started!* 🟢\n\nSeller matched your Buy Ad for ${formatUSDC(order.amount, tokenSymbol)}.\nCrypto is locked in escrow.\n\n👇 *Pay Now via UPI*`,
-                        { parse_mode: "Markdown" }
+                    const { txHash, tradeId } = await wallet.relayerCreateTrade(
+                        buyerUser!.wallet_address!,
+                        order.amount,
+                        tokenAddress
                     );
+
+                    // 4. Create Trade Record
+                    const trade = await db.createTrade({
+                        order_id: order.id,
+                        buyer_id: order.user_id, // Maker (Buyer)
+                        seller_id: seller.id,    // Taker (Seller)
+                        token: tokenSymbol,
+                        chain: "base",
+                        amount: order.amount,
+                        rate: order.rate,
+                        fiat_amount: order.amount * order.rate,
+                        fiat_currency: "INR",
+                        fee_amount: order.amount * env.FEE_PERCENTAGE,
+                        fee_percentage: env.FEE_PERCENTAGE,
+                        buyer_receives: order.amount - (order.amount * env.FEE_PERCENTAGE),
+                        payment_method: "UPI",
+                        status: "in_escrow",
+                        on_chain_trade_id: tradeId,
+                        escrow_tx_hash: txHash,
+                        created_at: new Date().toISOString(),
+                    });
+
+                    // 5. Mark Order as Filled
+                    await db.updateOrder(order.id, { status: "filled", filled_amount: order.amount });
+
+                    await ctx.editMessageText(
+                        `✅ Trade Started! Trade #${tradeId}\nWaiting for Buyer to pay.\nCheck /mytrades.`
+                    );
+
+                    // Notify Buyer (Maker)
+                    if (buyerUser && buyerUser.telegram_id) {
+                        await ctx.api.sendMessage(
+                            buyerUser.telegram_id,
+                            `🔔 *Trade Started!* 🟢\n\nSeller matched your Buy Ad for ${formatUSDC(order.amount, tokenSymbol)}.\nCrypto is locked in escrow.\n\n👇 *Pay Now via UPI*`,
+                            { parse_mode: "Markdown" }
+                        );
+                    }
+                } catch (blockchainError: any) {
+                    console.error("Sell trade initiation failed:", blockchainError);
+                    await ctx.editMessageText(`❌ Trade initiation failed: ${blockchainError.message || "Blockchain error"}.\n\n⚠️ If funds were already sent to the relayer, please contact support with this info.`);
+                    // We don't mark as filled here, so the Buy ad remains active.
                 }
             }
         } catch (e) {
@@ -2643,6 +2738,35 @@ bot.on("message:text", async (ctx) => {
                     );
                 } else {
                     await ctx.reply(intent.response || "Please provide amount and rate.\n\nExample: *sell 100 usdc at 88*", { parse_mode: "Markdown" });
+                }
+                break;
+
+            case "CREATE_BUY_ORDER":
+                if (intent.params.amount && intent.params.rate) {
+                    const keyboard = new InlineKeyboard()
+                        .text("✅ Confirm Order", `create_buy:${intent.params.amount}:${intent.params.rate}`)
+                        .text("❌ Cancel", "cancel_action");
+
+                    await ctx.reply(
+                        [
+                            "📝 *Create Buy Order*",
+                            "",
+                            `Amount: ${formatUSDC(intent.params.amount)}`,
+                            `Rate: ${formatINR(intent.params.rate)}/USDC`,
+                            `Total: ${formatINR(intent.params.amount * intent.params.rate)}`,
+                            `Payment: ${intent.params.paymentMethod || "UPI"}`,
+                            "",
+                            "Confirm to list this order?",
+                        ].join("\n"),
+                        { parse_mode: "Markdown", reply_markup: keyboard }
+                    );
+                } else if (intent.params.amount) {
+                    // Just amount, ask for rate
+                    ctx.session.ad_draft = { type: "buy", amount: intent.params.amount, token: "USDC" };
+                    ctx.session.awaiting_input = "ad_rate_buy";
+                    await ctx.reply(`I've set the amount to ${intent.params.amount} USDC.\n\nAt what rate (INR) do you want to buy?`);
+                } else {
+                    await ctx.reply(intent.response || "Please provide amount and rate.\n\nExample: *buy 100 usdc at 85*", { parse_mode: "Markdown" });
                 }
                 break;
 

@@ -40,24 +40,13 @@ class Database {
             return existing as User;
         }
 
-        // Create new user with unique wallet index
-        // Find current max index to assign next one
-        const { data: lastUser } = await db
-            .from("users")
-            .select("wallet_index")
-            .order("wallet_index", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        const nextIndex = lastUser ? lastUser.wallet_index + 1 : 1; // Start from 1? 0 is admin? 
-
+        // Create new user (wallet_index is handled by DB sequence/default)
         const { data: newUser, error } = await db
             .from("users")
             .insert({
                 telegram_id: telegramId,
                 username: username || null,
-                first_name: firstName || null,
-                wallet_index: nextIndex
+                first_name: firstName || null
             })
             .select()
             .single();
@@ -223,6 +212,29 @@ class Database {
             .eq("status", "active"); // Double check status hasn't changed
 
         return !error;
+    }
+    /**
+     * Revert a fill if the trade creation fails
+     */
+    async revertFillOrder(orderId: string, amount: number): Promise<void> {
+        const db = this.getClient();
+        const { data: order } = await db
+            .from("orders")
+            .select("filled_amount, amount")
+            .eq("id", orderId)
+            .single();
+
+        if (!order) return;
+
+        const newFilled = Math.max(0, order.filled_amount - amount);
+        await db
+            .from("orders")
+            .update({
+                filled_amount: newFilled,
+                status: "active",
+                updated_at: new Date().toISOString()
+            })
+            .eq("id", orderId);
     }
 
     async cancelOrder(orderId: string): Promise<void> {
