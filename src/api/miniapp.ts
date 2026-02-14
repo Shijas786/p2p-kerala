@@ -165,15 +165,17 @@ router.get("/wallet/balances", async (req: Request, res: Response) => {
         const vaultBaseUsdc = await escrow.getVaultBalance(user.wallet_address, env.USDC_ADDRESS, 'base');
         const vaultBscUsdc = await escrow.getVaultBalance(user.wallet_address, "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", 'bsc');
 
-        const reservedBase = await db.getReservedAmount(user.id, 'USDC', 'base');
-        const reservedBsc = await db.getReservedAmount(user.id, 'USDC', 'bsc');
+        const reservedBaseUsdc = await db.getReservedAmount(user.id, 'USDC', 'base');
+        const reservedBscUsdc = await db.getReservedAmount(user.id, 'USDC', 'bsc');
+        const reservedBaseUsdt = await db.getReservedAmount(user.id, 'USDT', 'base');
+        const reservedBscUsdt = await db.getReservedAmount(user.id, 'USDT', 'bsc');
 
         res.json({
             ...balances,
             vault_base_usdc: vaultBaseUsdc,
             vault_bsc_usdc: vaultBscUsdc,
-            vault_base_reserved: reservedBase.toString(),
-            vault_bsc_reserved: reservedBsc.toString(),
+            vault_base_reserved: (reservedBaseUsdc + reservedBaseUsdt).toString(),
+            vault_bsc_reserved: (reservedBscUsdc + reservedBscUsdt).toString(),
             wallet_type: (user as any).wallet_type || 'bot'
         });
     } catch (err: any) {
