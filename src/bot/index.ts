@@ -1536,73 +1536,36 @@ bot.on("callback_query:data", async (ctx) => {
                 if (draft.type === "sell") {
                     const tokenSymbol = draft.token || "USDC";
                     const tokenAddress = (tokenSymbol === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+                    const amount = draft.amount!;
 
-                    const feeAmount = draft.amount * env.FEE_PERCENTAGE;
-                    const totalRequired = draft.amount + feeAmount;
+                    await ctx.editMessageText(`⏳ Checking your Vault balance for ${tokenSymbol}...`);
 
-                    await ctx.editMessageText(`⏳ Checking your ${tokenSymbol} balance (Amount + Fee)...`);
+                    // Use Vault balance instead of wallet balance
+                    const vaultBalance = await escrow.getVaultBalance(user.wallet_address!, tokenAddress);
+                    const balanceNum = parseFloat(vaultBalance);
 
-                    // Step 1: Check seller's balance
-                    const balance = await wallet.getTokenBalance(user.wallet_address!, tokenAddress);
-                    const balanceNum = parseFloat(balance);
-
-                    if (balanceNum < totalRequired) {
+                    if (balanceNum < amount) {
                         await ctx.reply(
                             [
-                                `❌ *Insufficient ${tokenSymbol} Balance*`,
+                                `❌ *Insufficient Vault Balance*`,
                                 "",
-                                `Your balance: *${formatUSDC(balanceNum, tokenSymbol)}*`,
-                                `Required: *${formatUSDC(totalRequired, tokenSymbol)}* (incl. fee)`,
-                                `Short by: *${formatUSDC(totalRequired - balanceNum, tokenSymbol)}*`,
+                                `You want to sell: *${formatUSDC(amount, tokenSymbol)}*`,
+                                `Your Vault balance: *${formatUSDC(balanceNum, tokenSymbol)}*`,
                                 "",
-                                `📥 Deposit ${tokenSymbol} to your wallet:`,
-                                `\`${user.wallet_address}\``,
+                                `📥 *To list this ad, you must first deposit funds to the Vault.*`,
+                                `You can do this via the /wallet menu or the Mini App.`,
                                 "",
-                                "Then try /newad again.",
+                                `_This ensures your ad is backed by real collateral._`,
                             ].join("\n"),
                             { parse_mode: "Markdown" }
                         );
                         ctx.session.ad_draft = undefined;
-                        ctx.session.awaiting_input = undefined;
                         await ctx.answerCallbackQuery();
                         return;
                     }
 
-                    // Step 1.5: Check ETH balance for gas
-                    const balances = await wallet.getBalances(user.wallet_address!);
-                    const ethBalance = balances.eth;
-                    if (parseFloat(ethBalance) < 0.000005) { // Min 0.000005 ETH for gas (Base is cheap!)
-                        await ctx.reply(
-                            [
-                                "❌ *Insufficient ETH for Gas*",
-                                "",
-                                "You need a small amount of ETH to pay for the blockchain transaction to lock your crypto.",
-                                "",
-                                `Current balance: \`${ethBalance} ETH\``,
-                                "Required: ~`0.00001 ETH`",
-                                "",
-                                `📥 Deposit ETH to: \`${user.wallet_address}\``,
-                            ].join("\n"),
-                            { parse_mode: "Markdown" }
-                        );
-                        return;
-                    }
-
-                    // Step 2: Lock Token — transfer to bot's escrow wallet
-                    await ctx.editMessageText("🔒 Locking your crypto in escrow...");
-
-                    const relayerAddress = env.ADMIN_WALLET_ADDRESS;
-
-                    // Transfer TOTAL (Amount + Fee) to Relayer
-                    const escrowTxHash = await wallet.sendToken(
-                        user.wallet_index,
-                        relayerAddress,
-                        totalRequired.toString(),
-                        tokenAddress
-                    );
-
-                    // Step 3: Create the order in database (with escrow proof)
-                    const amount = draft.amount!;
+                    // No need to manually "lock" now - it stays in Vault until matched
+                    const escrowTxHash = "vault_backed";
                     const token = draft.token! || "USDC";
 
                     const order = await db.createOrder({
@@ -1625,7 +1588,10 @@ bot.on("callback_query:data", async (ctx) => {
                     });
 
                     const totalFiat = amount * draft.rate;
-                    const explorerUrl = getExplorerUrl(escrowTxHash);
+                    const feeAmount = amount * env.FEE_PERCENTAGE;
+
+                    // Vault-backed ads don't have a specific lock tx yet (it happened during deposit)
+                    const explorerUrl = "https://basescan.org/address/" + env.ESCROW_CONTRACT_ADDRESS;
 
                     // Clear draft
                     ctx.session.ad_draft = undefined;
@@ -1658,11 +1624,11 @@ bot.on("callback_query:data", async (ctx) => {
                         .text("📢 View My Ads", "myads_view")
                         .text("📢 Create Another", "newad_start")
                         .row()
-                        .text("🗑️ Cancel & Unlock", `ad_cancel_unlock:${order.id}`);
+                        .text("🗑️ Delete Ad", `ad_delete:${order.id}`);
 
                     await ctx.reply(
                         [
-                            "✅ *Sell Ad Created — Funds Locked!*",
+                            "✅ *Sell Ad Created!*",
                             "",
                             "🔴 *SELL Ad*",
                             "",
@@ -1672,14 +1638,14 @@ bot.on("callback_query:data", async (ctx) => {
                             `💳 Payment: ${paymentMethods.join(", ")}`,
                             `🏷️ Fee: ${formatUSDC(feeAmount)} (0.5%)`,
                             "",
-                            `🔒 *USDC Locked in Escrow* ✅`,
-                            `🔗 [View on BaseScan](${explorerUrl})`,
+                            `🔒 *Vault Backed* ✅`,
+                            `🔗 [View Vault Balance](${explorerUrl})`,
                             "",
                             `🆔 Ad ID: \`${order.id.slice(0, 8)}\``,
                             "",
                             "━━━━━━━━━━━━━━━━━━━",
                             "Your ad is now LIVE! Buyers can see it.",
-                            "Cancel anytime to unlock your USDC.",
+                            "You can withdraw your funds from the Vault anytime via /wallet.",
                         ].join("\n"),
                         { parse_mode: "Markdown", reply_markup: keyboard }
                     );
