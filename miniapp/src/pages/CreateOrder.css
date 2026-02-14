@@ -137,6 +137,25 @@
     gap: 8px;
     margin-top: 12px;
     flex-wrap: wrap;
+    justify-content: center;
+}
+
+.btn-preset {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-preset:hover {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(132, 204, 22, 0.1);
 }
 
 .co-total {
@@ -190,6 +209,17 @@
     border-bottom: none;
 }
 
+.co-vault-status {
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.border-green {
+    border-color: rgba(132, 204, 22, 0.3) !important;
+}
+
 .co-error {
     padding: 10px 16px;
     background: var(--red-bg);
@@ -204,4 +234,13 @@
     display: flex;
     gap: 12px;
     padding-top: 8px;
+}
+
+.btn-warn {
+    background: #f59e0b !important;
+    color: #000 !important;
+}
+
+.btn-warn:hover {
+    background: #d97706 !important;
 }
