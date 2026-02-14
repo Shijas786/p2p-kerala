@@ -368,6 +368,30 @@ router.post("/orders", async (req: Request, res: Response) => {
             }
         }
 
+        // ═══ VALIDATION: Sell Orders ═══
+        if (type === 'sell') {
+            // 1. Vault only supports ERC20 (USDC/USDT)
+            if (token !== 'USDC' && token !== 'USDT') {
+                return res.status(400).json({ error: "Only USDC/USDT sell ads are supported on Mini App currently." });
+            }
+
+            // 2. Check Vault Balance (Anti-Scam / liquidity check)
+            let tokenAddress = env.USDC_ADDRESS;
+            if (orderChain === 'bsc') {
+                tokenAddress = (token === "USDT") ? "0x55d398326f99059fF775485246999027B3197955" : "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+            } else {
+                tokenAddress = (token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+            }
+
+            // Check if user has enough funds in Vault
+            const balance = await escrow.getVaultBalance(user.wallet_address!, tokenAddress, orderChain as any);
+            if (parseFloat(balance) < parsedAmount) {
+                return res.status(400).json({
+                    error: `Insufficient Vault Balance! You have ${balance} ${token}. Deposit ${parsedAmount - parseFloat(balance)} more to Vault.`
+                });
+            }
+        }
+
         const order = await db.createOrder({
             user_id: user.id,
             type,
@@ -377,6 +401,7 @@ router.post("/orders", async (req: Request, res: Response) => {
             rate: parsedRate,
             fiat_currency: "INR",
             payment_methods: payment_methods || ["UPI"],
+            // payment_details: {}, // Optional in schema
             expires_at: expiresAt
         });
 
@@ -464,6 +489,11 @@ router.post("/trades", async (req: Request, res: Response) => {
         // ═══ BALANCE CHECK: Verify seller still has enough funds ═══
         if (!seller.wallet_address) {
             return res.status(400).json({ error: "Seller has no wallet configured" });
+        }
+
+        // Vault only supports ERC20
+        if (order.token !== 'USDC' && order.token !== 'USDT') {
+            return res.status(400).json({ error: "Only USDC/USDT trades are supported via Vault." });
         }
 
         const tokenAddress = (order.token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
