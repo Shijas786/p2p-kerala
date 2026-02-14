@@ -2613,14 +2613,18 @@ bot.on("message:text", async (ctx) => {
     const botName = botInfo.username;
     let cleanText = text;
 
-    // Strip mention if present (e.g. "@MyBot sell 100")
-    if (botName && text.startsWith(`@${botName}`)) {
-        cleanText = text.replace(`@${botName}`, "").trim();
+    // Strip mention if present (e.g. "@MyBot sell 100") - Case Insensitive
+    if (botName) {
+        const mentionRegex = new RegExp(`^@${botName}`, "i");
+        if (mentionRegex.test(text)) {
+            // Replace only the start, case-insensitively
+            cleanText = text.replace(mentionRegex, "").trim();
+        }
     }
 
     // In groups, ONLY reply if mentioned or replying to bot
     if (ctx.chat.type !== "private") {
-        const isMentioned = text.includes(`@${botName}`);
+        const isMentioned = botName ? new RegExp(`@${botName}`, "i").test(text) : false;
         const isReplyToBot = ctx.message.reply_to_message?.from?.id === botInfo.id;
 
         if (!isMentioned && !isReplyToBot) {
