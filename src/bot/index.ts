@@ -2609,6 +2609,25 @@ bot.on("message:text", async (ctx) => {
     // Skip commands
     if (text.startsWith("/")) return;
 
+    const botInfo = await ctx.api.getMe();
+    const botName = botInfo.username;
+    let cleanText = text;
+
+    // Strip mention if present (e.g. "@MyBot sell 100")
+    if (botName && text.startsWith(`@${botName}`)) {
+        cleanText = text.replace(`@${botName}`, "").trim();
+    }
+
+    // In groups, ONLY reply if mentioned or replying to bot
+    if (ctx.chat.type !== "private") {
+        const isMentioned = text.includes(`@${botName}`);
+        const isReplyToBot = ctx.message.reply_to_message?.from?.id === botInfo.id;
+
+        if (!isMentioned && !isReplyToBot) {
+            return; // Ignore random group chatter
+        }
+    }
+
     const user = await ensureUser(ctx);
 
     // Handle awaiting input states
@@ -2835,17 +2854,25 @@ bot.on("message:text", async (ctx) => {
     try {
         // Save to conversation history
         ctx.session.conversation_history = ctx.session.conversation_history || [];
-        ctx.session.conversation_history.push({ role: "user", content: text });
+        ctx.session.conversation_history.push({ role: "user", content: cleanText });
 
         // If OpenAI is configured, use AI parsing
         let intent;
         if (env.OPENAI_API_KEY) {
-            intent = await ai.parseIntent(text, ctx.session.conversation_history);
+            intent = await ai.parseIntent(cleanText, ctx.session.conversation_history);
         } else {
             // Fallback to keyword matching
             intent = (ai as any).fallbackParse
-                ? (ai as any).fallbackParse(text)
+                ? (ai as any).fallbackParse(cleanText)
                 : { intent: "UNKNOWN", confidence: 0, params: {}, response: "" };
+        }
+
+        // Capture Group ID for Ad Creation
+        if (intent.intent === "CREATE_SELL_ORDER" || intent.intent === "CREATE_BUY_ORDER") {
+            if (ctx.chat.type === "supergroup" || ctx.chat.type === "group") {
+                // Attach group ID to params so we know where to broadcast later
+                intent.params.target_group_id = ctx.chat.id;
+            }
         }
 
         // Save AI response to history
