@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { wagmiConfig } from './lib/wagmi';
+import { wagmiConfig, appKit } from './lib/wagmi';
 import { setupTelegramApp } from './lib/telegram';
 import { useAuth } from './hooks/useAuth';
 import { Layout } from './components/Layout';
@@ -48,9 +48,10 @@ function AppInner() {
           setWalletChosen(true);
           // Bot wallet is auto-created on the backend
         }}
-        onSelectExternal={() => {
+        onSelectExternal={async () => {
+          // Open Reown/WalletConnect modal for external wallet connection
+          await appKit.open();
           setWalletChosen(true);
-          // Reown modal will be accessible from the Wallet page
         }}
       />
     );
