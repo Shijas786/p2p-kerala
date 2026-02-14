@@ -415,12 +415,19 @@ export function CreateOrder() {
                     <button
                         className={`btn flex-1 ${needsDeposit ? (isExternalUser ? 'btn-warn' : 'btn-secondary') : 'btn-primary'}`}
                         onClick={() => {
-                            if (isExternalUser && !isConnected) {
-                                appKit.open();
-                            } else if (!isExternalUser || !needsDeposit) {
-                                submit();
+                            if (isExternalUser) {
+                                if (!isConnected) {
+                                    appKit.open();
+                                } else {
+                                    submit();
+                                }
                             } else {
-                                navigate('/wallet');
+                                // Bot user
+                                if (needsDeposit) {
+                                    navigate('/wallet');
+                                } else {
+                                    submit();
+                                }
                             }
                         }}
                         disabled={submitting || (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance)))}
