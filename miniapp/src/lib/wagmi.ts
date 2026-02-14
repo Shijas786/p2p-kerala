@@ -1,7 +1,6 @@
-// Reown (WalletConnect) + Wagmi configuration
 import { createAppKit } from '@reown/appkit/react';
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { base } from '@reown/appkit/networks';
+import { base, bsc } from '@reown/appkit/networks';
 
 const projectId = '6dcf53c47cdea609c48bc1adb474bfd0';
 
@@ -15,13 +14,13 @@ const metadata = {
 // Create Wagmi adapter for Reown
 export const wagmiAdapter = new WagmiAdapter({
     projectId,
-    networks: [base],
+    networks: [base, bsc],
 });
 
 // Create the AppKit modal
 export const appKit = createAppKit({
     adapters: [wagmiAdapter],
-    networks: [base],
+    networks: [base, bsc],
     projectId,
     metadata,
     features: {

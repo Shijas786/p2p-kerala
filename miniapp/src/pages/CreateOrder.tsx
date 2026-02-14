@@ -43,22 +43,24 @@ export function CreateOrder() {
     const escrowAddress = (CONTRACTS as any)[chain]?.escrow;
 
     // 1. Check Vault Balance
-    const { data: vaultBalance } = useReadContract({
+    const { data: vaultBalance, isLoading: loadingVault } = useReadContract({
         address: escrowAddress,
         abi: ESCROW_ABI,
         functionName: 'balances',
         args: address && tokenAddress ? [address, tokenAddress] : undefined,
+        chainId: targetChainId,
         query: {
             enabled: !!address && !!tokenAddress && !!escrowAddress && type === 'sell'
         }
     });
 
     // 2. Check ERC20 Allowance
-    const { data: allowance } = useReadContract({
+    const { data: allowance, isLoading: loadingAllowance } = useReadContract({
         address: tokenAddress,
         abi: ERC20_ABI,
         functionName: 'allowance',
         args: address && escrowAddress ? [address, escrowAddress] : undefined,
+        chainId: targetChainId,
         query: {
             enabled: !!address && !!tokenAddress && !!escrowAddress && type === 'sell'
         }
@@ -76,6 +78,8 @@ export function CreateOrder() {
 
     const needsApproval = needsDeposit && allowance !== undefined && amount &&
         parseFloat(formatUnits(allowance as bigint, decimals)) < parseFloat(amount);
+
+    const isDataLoading = (type === 'sell' && isConnected) && (loadingVault || loadingAllowance);
 
     function toggleMethod(m: string) {
         haptic('selection');
@@ -107,6 +111,7 @@ export function CreateOrder() {
     }
 
     async function submit() {
+        if (isDataLoading) return;
         haptic('medium');
         setSubmitting(true);
         setError('');
@@ -138,6 +143,7 @@ export function CreateOrder() {
                         abi: ERC20_ABI,
                         functionName: 'approve',
                         args: [escrowAddress, amountUnits],
+                        chainId: targetChainId,
                     });
                     console.log('Approval Sent:', hash);
                     await waitForTransactionReceipt(wagmiConfig, { hash, chainId: targetChainId });
@@ -152,6 +158,7 @@ export function CreateOrder() {
                         abi: ESCROW_ABI,
                         functionName: 'deposit',
                         args: [tokenAddress, amountUnits],
+                        chainId: targetChainId,
                     });
                     console.log('Deposit Sent:', hash);
                     await waitForTransactionReceipt(wagmiConfig, { hash, chainId: targetChainId });
@@ -390,16 +397,21 @@ export function CreateOrder() {
                     <button
                         className={`btn flex-1 ${needsDeposit ? 'btn-warn' : 'btn-primary'}`}
                         onClick={submit}
-                        disabled={submitting}
+                        disabled={submitting || isDataLoading}
                     >
                         {submitting ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 justify-center">
                                 <span className="spinner" />
                                 <span className="text-xs uppercase font-bold">
                                     {txStep === 'approving' ? 'Approving...' :
                                         txStep === 'depositing' ? 'Depositing...' :
                                             txStep === 'creating' ? 'Publishing...' : 'Working...'}
                                 </span>
+                            </div>
+                        ) : isDataLoading ? (
+                            <div className="flex items-center gap-2 justify-center">
+                                <span className="spinner" />
+                                <span className="text-xs uppercase font-bold">Checking Vault...</span>
                             </div>
                         ) : (
                             needsDeposit ? `Deposit & Publish` : '✅ Publish Ad'
