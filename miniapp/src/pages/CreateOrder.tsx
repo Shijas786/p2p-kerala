@@ -6,7 +6,7 @@ import { parseUnits, formatUnits } from 'viem';
 import { api } from '../lib/api';
 import { haptic } from '../lib/telegram';
 import { CONTRACTS, ESCROW_ABI, ERC20_ABI } from '../lib/contracts';
-import { wagmiConfig } from '../lib/wagmi';
+import { wagmiConfig, appKit } from '../lib/wagmi';
 import { useAuth } from '../hooks/useAuth';
 import './CreateOrder.css';
 
@@ -40,6 +40,7 @@ export function CreateOrder() {
     const isCorrectChain = walletChain?.id === targetChainId;
 
     const tokenAddress = (CONTRACTS as any)[chain]?.tokens[token];
+    const isExternalUser = user?.wallet_type === 'external';
     const escrowAddress = (CONTRACTS as any)[chain]?.escrow;
 
     // 1. Check Vault Balance
@@ -73,13 +74,14 @@ export function CreateOrder() {
         bsc: ['USDC', 'USDT']
     };
 
-    const needsDeposit = type === 'sell' && isConnected && vaultBalance !== undefined && amount &&
+    const needsDeposit = type === 'sell' && isExternalUser && vaultBalance !== undefined && amount &&
         parseFloat(formatUnits(vaultBalance as bigint, decimals)) < parseFloat(amount);
 
     const needsApproval = needsDeposit && allowance !== undefined && amount &&
         parseFloat(formatUnits(allowance as bigint, decimals)) < parseFloat(amount);
 
-    const isDataLoading = (type === 'sell' && isConnected) && (loadingVault || loadingAllowance);
+    // Guard: Wait for balance info if external, AND wait for connection if we know we are an external user
+    const isDataLoading = (type === 'sell' && isExternalUser) && (loadingVault || loadingAllowance || !isConnected);
 
     function toggleMethod(m: string) {
         haptic('selection');
@@ -118,7 +120,14 @@ export function CreateOrder() {
 
         try {
             // ─── EXTERNAL WALLET FLOW ───
-            if (isConnected && type === 'sell') {
+            if (isExternalUser && type === 'sell') {
+                if (!isConnected || !address) {
+                    setError("External wallet disconnected. Please reconnect.");
+                    appKit.open();
+                    setSubmitting(false);
+                    return;
+                }
+
                 if (!isCorrectChain) {
                     setError(`Please switch to ${chain === 'bsc' ? 'BSC' : 'Base'} network`);
                     await switchChain({ chainId: targetChainId });
@@ -134,6 +143,9 @@ export function CreateOrder() {
                 }
 
                 const amountUnits = parseUnits(amount, decimals);
+                console.log('[DEBUG] VaultBalance:', vaultBalance ? formatUnits(vaultBalance as bigint, decimals) : 'N/A');
+                console.log('[DEBUG] Allowance:', allowance ? formatUnits(allowance as bigint, decimals) : 'N/A');
+                console.log('[DEBUG] Target:', amount);
 
                 // 1. Approve if needed
                 if (needsApproval) {
@@ -147,7 +159,7 @@ export function CreateOrder() {
                     });
                     console.log('Approval Sent:', hash);
                     await waitForTransactionReceipt(wagmiConfig, { hash, chainId: targetChainId });
-                    console.log('Approval Confirmed');
+                    // Allowance might not update instantly in hooks, so we might need a manual refetch or trust logic
                 }
 
                 // 2. Deposit if needed
@@ -162,7 +174,6 @@ export function CreateOrder() {
                     });
                     console.log('Deposit Sent:', hash);
                     await waitForTransactionReceipt(wagmiConfig, { hash, chainId: targetChainId });
-                    console.log('Deposit Confirmed');
                 }
             }
 
