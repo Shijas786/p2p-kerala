@@ -8,6 +8,7 @@ create table public.users (
   username text,
   first_name text,
   wallet_address text,
+  wallet_type text not null default 'bot' check (wallet_type in ('bot', 'external')),
   wallet_index integer not null default 0, -- HD Wallet Index
   upi_id text,
   bank_details jsonb,

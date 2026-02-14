@@ -28,6 +28,7 @@ export interface User {
     username: string | null;
     first_name: string | null;
     wallet_address: string | null;
+    wallet_type: 'bot' | 'external';
     wallet_index: number;
     upi_id: string | null;
     bank_details: BankDetails | null;

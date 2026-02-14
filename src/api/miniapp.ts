@@ -85,7 +85,7 @@ function validateInitData(req: Request, res: Response, next: NextFunction) {
 
         const authDate = parseInt(params.get("auth_date") || "0");
         const now = Math.floor(Date.now() / 1000);
-        if (now - authDate > 300 && env.NODE_ENV !== "development") {
+        if (now - authDate > 86400 && env.NODE_ENV !== "development") {
             return res.status(401).json({ error: "Auth data expired" });
         }
 
@@ -147,9 +147,18 @@ router.post("/wallet/send", async (req: Request, res: Response) => {
             return res.status(400).json({ error: "No wallet configured" });
         }
 
+        // External wallets can't sign server-side
+        if ((user as any).wallet_type === 'external') {
+            return res.status(400).json({ error: "External wallets must send via your wallet app (MetaMask, etc.)" });
+        }
+
         const { to, amount, token } = req.body;
         if (!to || !amount) {
             return res.status(400).json({ error: "Missing to/amount" });
+        }
+
+        if (amount <= 0 || amount > 100000) {
+            return res.status(400).json({ error: "Invalid amount" });
         }
 
         let txHash: string;
@@ -177,10 +186,18 @@ router.post("/wallet/connect", async (req: Request, res: Response) => {
         const { address } = req.body;
         if (!address) return res.status(400).json({ error: "Missing address" });
 
+        // Validate Ethereum address format
+        if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+            return res.status(400).json({ error: "Invalid Ethereum address" });
+        }
+
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
         if (!user) return res.status(404).json({ error: "User not found" });
 
-        await db.updateUser(user.id, { wallet_address: address } as any);
+        await db.updateUser(user.id, {
+            wallet_address: address,
+            wallet_type: 'external',
+        } as any);
 
         res.json({ success: true });
     } catch (err: any) {
@@ -246,6 +263,13 @@ router.post("/orders", async (req: Request, res: Response) => {
 
 router.post("/orders/:id/cancel", async (req: Request, res: Response) => {
     try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(401).json({ error: "User not found" });
+
+        const order = await db.getOrderById(req.params.id as string);
+        if (!order) return res.status(404).json({ error: "Order not found" });
+        if (order.user_id !== user.id) return res.status(403).json({ error: "Not your order" });
+
         await db.cancelOrder(req.params.id as string);
         res.json({ success: true });
     } catch (err: any) {
@@ -289,28 +313,50 @@ router.post("/trades", async (req: Request, res: Response) => {
 
         const order = await db.getOrderById(order_id);
         if (!order) return res.status(404).json({ error: "Order not found" });
+        if (order.status !== "active") return res.status(400).json({ error: "Order is no longer active" });
+
+        // Prevent self-trade
+        if (order.user_id === user.id) {
+            return res.status(400).json({ error: "Cannot trade with your own order" });
+        }
 
         const tradeAmount = amount || order.amount;
+        if (tradeAmount <= 0 || tradeAmount > order.amount - (order.filled_amount || 0)) {
+            return res.status(400).json({ error: "Invalid trade amount" });
+        }
+
+        // Atomically fill the order to prevent double-matching
+        const filled = await db.fillOrder(order_id, tradeAmount);
+        if (!filled) {
+            return res.status(409).json({ error: "Order already filled or no longer active" });
+        }
+
         const fiatAmount = tradeAmount * order.rate;
         const feeAmount = tradeAmount * 0.005;
         const buyerReceives = tradeAmount - feeAmount;
 
-        const trade = await db.createTrade({
-            order_id: order.id,
-            buyer_id: order.type === "sell" ? user.id : order.user_id,
-            seller_id: order.type === "sell" ? order.user_id : user.id,
-            token: order.token,
-            chain: order.chain,
-            amount: tradeAmount,
-            rate: order.rate,
-            fiat_amount: fiatAmount,
-            fiat_currency: order.fiat_currency,
-            fee_amount: feeAmount,
-            buyer_receives: buyerReceives,
-            payment_method: ((order.payment_methods as string[]) || [])[0] as any || "UPI",
-        });
+        try {
+            const trade = await db.createTrade({
+                order_id: order.id,
+                buyer_id: order.type === "sell" ? user.id : order.user_id,
+                seller_id: order.type === "sell" ? order.user_id : user.id,
+                token: order.token,
+                chain: order.chain,
+                amount: tradeAmount,
+                rate: order.rate,
+                fiat_amount: fiatAmount,
+                fiat_currency: order.fiat_currency,
+                fee_amount: feeAmount,
+                buyer_receives: buyerReceives,
+                payment_method: ((order.payment_methods as string[]) || [])[0] as any || "UPI",
+            });
 
-        res.json({ trade });
+            res.json({ trade });
+        } catch (tradeErr) {
+            // Revert the fill if trade creation fails
+            await db.revertFillOrder(order_id, tradeAmount);
+            throw tradeErr;
+        }
     } catch (err: any) {
         console.error("[MINIAPP] Create trade error:", err);
         res.status(500).json({ error: err.message });
@@ -319,9 +365,18 @@ router.post("/trades", async (req: Request, res: Response) => {
 
 router.post("/trades/:id/confirm-payment", async (req: Request, res: Response) => {
     try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(401).json({ error: "User not found" });
+
+        const trade = await db.getTradeById(req.params.id as string);
+        if (!trade) return res.status(404).json({ error: "Trade not found" });
+        if (trade.buyer_id !== user.id) return res.status(403).json({ error: "Only the buyer can confirm payment" });
+        if (trade.status !== "in_escrow") return res.status(400).json({ error: "Trade not in escrow state" });
+
         await db.updateTrade(req.params.id as string, {
             status: "fiat_sent",
             fiat_sent_at: new Date().toISOString() as any,
+            auto_release_at: new Date(Date.now() + parseInt(env.AUTO_RELEASE_SECONDS) * 1000).toISOString() as any,
         });
         res.json({ success: true });
     } catch (err: any) {
@@ -331,11 +386,37 @@ router.post("/trades/:id/confirm-payment", async (req: Request, res: Response) =
 
 router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) => {
     try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(401).json({ error: "User not found" });
+
+        const trade = await db.getTradeById(req.params.id as string);
+        if (!trade) return res.status(404).json({ error: "Trade not found" });
+        if (trade.seller_id !== user.id) return res.status(403).json({ error: "Only the seller can confirm receipt" });
+        if (trade.status !== "fiat_sent") return res.status(400).json({ error: "Buyer hasn't confirmed fiat sent yet" });
+
+        // Release escrow on-chain if trade has on_chain_trade_id
+        let releaseTxHash: string | null = null;
+        if (trade.on_chain_trade_id) {
+            try {
+                releaseTxHash = await escrow.release(trade.on_chain_trade_id);
+            } catch (escrowErr: any) {
+                console.error("[MINIAPP] Escrow release failed:", escrowErr);
+                return res.status(500).json({ error: "Failed to release escrow: " + escrowErr.message });
+            }
+        }
+
         await db.updateTrade(req.params.id as string, {
-            status: "fiat_confirmed",
+            status: "completed",
             fiat_confirmed_at: new Date().toISOString() as any,
+            completed_at: new Date().toISOString() as any,
+            release_tx_hash: releaseTxHash as any,
         });
-        res.json({ success: true });
+
+        // Update trust scores for both parties
+        await db.completeUserTrade(trade.buyer_id, true);
+        await db.completeUserTrade(trade.seller_id, true);
+
+        res.json({ success: true, release_tx_hash: releaseTxHash });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -343,6 +424,18 @@ router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) =
 
 router.post("/trades/:id/dispute", async (req: Request, res: Response) => {
     try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(401).json({ error: "User not found" });
+
+        const trade = await db.getTradeById(req.params.id as string);
+        if (!trade) return res.status(404).json({ error: "Trade not found" });
+        if (trade.buyer_id !== user.id && trade.seller_id !== user.id) {
+            return res.status(403).json({ error: "Not a party to this trade" });
+        }
+        if (!['in_escrow', 'fiat_sent'].includes(trade.status)) {
+            return res.status(400).json({ error: "Cannot dispute in current state" });
+        }
+
         const { reason } = req.body;
         await db.updateTrade(req.params.id as string, {
             status: "disputed",

@@ -129,13 +129,19 @@ export function Wallet({ user }: Props) {
 
             {/* Actions */}
             <div className="w-actions">
-                <button
-                    className="btn btn-primary flex-1"
-                    onClick={() => { haptic('medium'); setShowSend(!showSend); }}
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
-                >
-                    <IconSend size={16} /> Send
-                </button>
+                {user?.wallet_type !== 'external' ? (
+                    <button
+                        className="btn btn-primary flex-1"
+                        onClick={() => { haptic('medium'); setShowSend(!showSend); }}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                    >
+                        <IconSend size={16} /> Send
+                    </button>
+                ) : (
+                    <div className="btn btn-secondary flex-1" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: 0.7, cursor: 'default' }}>
+                        <IconSend size={16} /> Use wallet app to send
+                    </div>
+                )}
                 <button className="btn btn-secondary flex-1" onClick={copyAddress} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                     <IconReceive size={16} /> Receive
                 </button>

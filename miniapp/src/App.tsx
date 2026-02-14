@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Component, ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { WagmiProvider } from 'wagmi';
 import { useAccount } from 'wagmi';
@@ -23,6 +23,51 @@ const queryClient = new QueryClient({
     queries: { retry: 2, staleTime: 30000 },
   },
 });
+
+// Error Boundary to prevent white-screen crashes
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+
+  componentDidCatch(error: Error, info: any) {
+    console.error('[P2P Kerala] Crash:', error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', height: '100vh', padding: 24,
+          background: '#050505', color: '#fff', textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <h2 style={{ marginBottom: 8 }}>Something went wrong</h2>
+          <p style={{ color: '#888', fontSize: 14, marginBottom: 20 }}>{this.state.error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              padding: '10px 24px', background: '#00D26A', color: '#000',
+              border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            Reload App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function AppInner() {
   const { user, loading, refreshUser } = useAuth();
@@ -92,11 +137,13 @@ function AppInner() {
 
 function App() {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <AppInner />
-      </QueryClientProvider>
-    </WagmiProvider>
+    <ErrorBoundary>
+      <WagmiProvider config={wagmiConfig}>
+        <QueryClientProvider client={queryClient}>
+          <AppInner />
+        </QueryClientProvider>
+      </WagmiProvider>
+    </ErrorBoundary>
   );
 }
 

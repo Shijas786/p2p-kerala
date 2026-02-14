@@ -3,10 +3,7 @@ import { getInitData } from './telegram';
 
 const API_BASE = '/api/miniapp';
 
-interface ApiResponse<T = any> {
-    data?: T;
-    error?: string;
-}
+
 
 async function request<T>(
     endpoint: string,
@@ -14,21 +11,42 @@ async function request<T>(
 ): Promise<T> {
     const initData = getInitData();
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Telegram-Init-Data': initData,
-            ...options.headers,
-        },
-    });
+    // 15-second timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Request failed: ${res.status}`);
+    try {
+        const res = await fetch(`${API_BASE}${endpoint}`, {
+            ...options,
+            signal: controller.signal,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Telegram-Init-Data': initData,
+                ...options.headers,
+            },
+        });
+
+        if (!res.ok) {
+            let errorMsg = `Request failed: ${res.status}`;
+            try {
+                const body = await res.json();
+                errorMsg = body.error || errorMsg;
+            } catch {
+                // Response wasn't JSON, use status text
+                errorMsg = res.statusText || errorMsg;
+            }
+            throw new Error(errorMsg);
+        }
+
+        return res.json();
+    } catch (err: any) {
+        if (err.name === 'AbortError') {
+            throw new Error('Request timed out. Please try again.');
+        }
+        throw err;
+    } finally {
+        clearTimeout(timeoutId);
     }
-
-    return res.json();
 }
 
 // ---- Auth ----
