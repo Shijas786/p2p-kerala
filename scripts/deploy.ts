@@ -15,12 +15,18 @@ async function main() {
     }
 
     // Deploy
-    const Escrow = await ethers.getContractFactory("Escrow");
+    const Escrow = await ethers.getContractFactory("P2PEscrow");
     // Set feeCollector as deployer (or env variable if you prefer)
     const feeCollector = deployer.address;
     console.log("🏦 Fee Collector set as:", feeCollector);
 
-    const escrow = await Escrow.deploy(feeCollector);
+    const usdcAddress = process.env.USDC_ADDRESS || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+    if (!ethers.isAddress(usdcAddress)) {
+        throw new Error("Invalid USDC address");
+    }
+    console.log("💵 USDC Address:", usdcAddress);
+
+    const escrow = await Escrow.deploy(feeCollector, usdcAddress);
 
     await escrow.waitForDeployment();
     const address = await escrow.getAddress();

@@ -23,6 +23,13 @@ async function main() {
 
     // Start the bot
     console.log("  Starting Telegram bot (long polling)...");
+
+    // Background Jobs
+    if (env.NODE_ENV !== 'test') {
+        const { startExpiryJob } = await import("./services/jobs");
+        startExpiryJob();
+    }
+
     console.log("");
 
     // Start Express Server (Website + Health Check)

@@ -143,6 +143,10 @@ class Database {
             query = query.eq("type", type);
         }
 
+        // Filter expired (expires_at is null OR > now)
+        const now = new Date().toISOString();
+        query = query.or(`expires_at.is.null,expires_at.gt.${now}`);
+
         const { data, error } = await query;
         if (error) throw new Error(`Failed to get orders: ${error.message}`);
 
@@ -195,11 +199,13 @@ class Database {
         const db = this.getClient();
 
         // 1. Get current order with lock-like check
+        const now = new Date().toISOString();
         const { data: order } = await db
             .from("orders")
             .select("*")
             .eq("id", orderId)
             .eq("status", "active")
+            .or(`expires_at.is.null,expires_at.gt.${now}`) // Ensure not expired
             .single();
 
         if (!order) return false;
@@ -207,7 +213,7 @@ class Database {
         const newFilled = order.filled_amount + amount;
         const newStatus = newFilled >= order.amount ? "filled" : "active";
 
-        const { error } = await db
+        const { data, error } = await db
             .from("orders")
             .update({
                 filled_amount: newFilled,
@@ -215,7 +221,10 @@ class Database {
                 updated_at: new Date().toISOString()
             })
             .eq("id", orderId)
-            .eq("status", "active"); // Double check status hasn't changed
+            .eq("status", "active") // Double check status hasn't changed
+            .select();
+
+        return !error && data && data.length > 0;
 
         return !error;
     }

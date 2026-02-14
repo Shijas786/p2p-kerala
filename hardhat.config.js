@@ -22,11 +22,17 @@ module.exports = {
             url: "https://sepolia.base.org",
             accounts: process.env.RELAYER_PRIVATE_KEY ? [process.env.RELAYER_PRIVATE_KEY] : [],
         },
+        bsc: {
+            url: process.env.BSC_RPC_URL || "https://bsc-dataseed.binance.org/",
+            chainId: 56,
+            accounts: process.env.RELAYER_PRIVATE_KEY ? [process.env.RELAYER_PRIVATE_KEY] : [],
+        },
     },
     etherscan: {
         apiKey: {
             base: process.env.BASESCAN_API_KEY || "",
             baseSepolia: process.env.BASESCAN_API_KEY || "",
+            bsc: process.env.BSCSCAN_API_KEY || "",
         },
         customChains: [
             {
@@ -43,6 +49,14 @@ module.exports = {
                 urls: {
                     apiURL: "https://api-sepolia.basescan.org/api",
                     browserURL: "https://sepolia.basescan.org"
+                }
+            },
+            {
+                network: "bsc",
+                chainId: 56,
+                urls: {
+                    apiURL: "https://api.bscscan.com/api",
+                    browserURL: "https://bscscan.com"
                 }
             }
         ]

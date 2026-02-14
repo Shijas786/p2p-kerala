@@ -15,6 +15,9 @@ const ERC20_ABI = [
 const ESCROW_ABI = [
     // Trade functions
     "function createTrade(address buyer, address token, uint256 amount, uint256 duration) returns (uint256)",
+    "function createTradeByRelayer(address seller, address buyer, address token, uint256 amount, uint256 duration) returns (uint256)",
+    "function deposit(address token, uint256 amount)",
+    "function withdraw(address token, uint256 amount)",
     "function markFiatSent(uint256 tradeId)",
     "function release(uint256 tradeId)",
     "function refund(uint256 tradeId)",
@@ -30,209 +33,129 @@ const ESCROW_ABI = [
     "function getContractBalance(address token) view returns (uint256)",
     "function feeBps() view returns (uint256)",
     "function approvedTokens(address) view returns (bool)",
-
-    // Events
-    "event TradeCreated(uint256 indexed tradeId, address indexed seller, address indexed buyer, address token, uint256 amount, uint256 feeAmount, uint256 deadline)",
-    "event FiatMarkedSent(uint256 indexed tradeId, address indexed buyer, uint256 autoReleaseDeadline)",
-    "event TradeReleased(uint256 indexed tradeId, address indexed buyer, uint256 buyerReceives, uint256 feeAmount)",
-    "event AutoReleased(uint256 indexed tradeId, address indexed buyer, uint256 buyerReceives, uint256 feeAmount)",
-    "event TradeRefunded(uint256 indexed tradeId, address indexed seller, uint256 amount)",
-    "event TradeDisputed(uint256 indexed tradeId, address indexed initiator, string reason)",
-    "event DisputeResolved(uint256 indexed tradeId, address indexed resolver, bool releasedToBuyer)",
+    "function balances(address user, address token) view returns (uint256)",
 ];
 
-class EscrowService {
-    private provider: ethers.JsonRpcProvider | null = null;
-    private relayerWallet: ethers.Wallet | null = null;
-    private escrowContract: ethers.Contract | null = null;
-    private usdcContract: ethers.Contract | null = null;
+type Chain = 'base' | 'bsc';
 
-    private getProvider(): ethers.JsonRpcProvider {
-        if (!this.provider) {
-            this.provider = new ethers.JsonRpcProvider(env.BASE_RPC_URL);
+class EscrowService {
+    private providers: Record<string, ethers.JsonRpcProvider | null> = {
+        base: null,
+        bsc: null
+    };
+    private relayers: Record<string, ethers.Wallet | null> = {
+        base: null,
+        bsc: null
+    };
+
+    private getProvider(chain: Chain = 'base'): ethers.JsonRpcProvider {
+        if (!this.providers[chain]) {
+            const url = chain === 'base' ? env.BASE_RPC_URL : env.BSC_RPC_URL;
+            this.providers[chain] = new ethers.JsonRpcProvider(url);
         }
-        return this.provider;
+        return this.providers[chain]!;
     }
 
-    private getRelayer(): ethers.Wallet {
-        if (!this.relayerWallet) {
+    private getRelayer(chain: Chain = 'base'): ethers.Wallet {
+        if (!this.relayers[chain]) {
             if (!env.RELAYER_PRIVATE_KEY) {
                 throw new Error("Relayer private key not configured");
             }
-            this.relayerWallet = new ethers.Wallet(env.RELAYER_PRIVATE_KEY, this.getProvider());
+            this.relayers[chain] = new ethers.Wallet(env.RELAYER_PRIVATE_KEY, this.getProvider(chain));
         }
-        return this.relayerWallet;
+        return this.relayers[chain]!;
     }
 
-    private getEscrowContract(): ethers.Contract {
-        if (!this.escrowContract) {
-            if (!env.ESCROW_CONTRACT_ADDRESS) {
-                throw new Error("Escrow contract address not configured");
+    private getContractAddress(chain: Chain): string {
+        return chain === 'base' ? env.ESCROW_CONTRACT_ADDRESS : env.ESCROW_CONTRACT_ADDRESS_BSC;
+    }
+
+    private getEscrowContract(chain: Chain = 'base'): ethers.Contract {
+        const address = this.getContractAddress(chain);
+        if (!address) throw new Error(`Escrow contract address not configured for ${chain}`);
+
+        return new ethers.Contract(address, ESCROW_ABI, this.getRelayer(chain));
+    }
+
+    // ═══════════════════════════════════════
+    //          VAULT & RELAYER FUNCTIONS
+    // ═══════════════════════════════════════
+
+    async getVaultBalance(userAddress: string, tokenAddress: string, chain: Chain = 'base'): Promise<string> {
+        try {
+            const contract = this.getEscrowContract(chain);
+            // Default to 6 decimals for USDC/USDT on Base, 18 elsewhere unless specified
+            const balance: bigint = await contract.balances(userAddress, tokenAddress);
+
+            let decimals = 18;
+            if (chain === 'base' && (tokenAddress === env.USDC_ADDRESS || tokenAddress === env.USDT_ADDRESS)) {
+                decimals = 6;
             }
-            this.escrowContract = new ethers.Contract(
-                env.ESCROW_CONTRACT_ADDRESS,
-                ESCROW_ABI,
-                this.getRelayer()
-            );
+
+            return ethers.formatUnits(balance, decimals);
+        } catch (err) {
+            console.error(`[ESCROW] Failed to get vault balance on ${chain}:`, err);
+            return "0";
         }
-        return this.escrowContract;
     }
 
-    private getUSDC(): ethers.Contract {
-        if (!this.usdcContract) {
-            this.usdcContract = new ethers.Contract(
-                env.USDC_ADDRESS,
-                ERC20_ABI,
-                this.getRelayer()
-            );
+    /**
+     * Relayer starts a trade (locks funds) for a match found in DB
+     */
+    async createRelayedTrade(
+        seller: string,
+        buyer: string,
+        token: string,
+        amount: string,
+        duration: number,
+        chain: Chain = 'base'
+    ): Promise<string> {
+        const contract = this.getEscrowContract(chain);
+
+        let decimals = 18;
+        if (chain === 'base' && (token === env.USDC_ADDRESS || token === env.USDT_ADDRESS)) {
+            decimals = 6;
         }
-        return this.usdcContract;
-    }
 
-    // ═══════════════════════════════════════
-    //          READ FUNCTIONS
-    // ═══════════════════════════════════════
+        const amountUnits = ethers.parseUnits(amount, decimals);
 
-    /**
-     * Get USDC balance of an address
-     */
-    async getBalance(address: string): Promise<string> {
-        const usdc = this.getUSDC();
-        const balance = await usdc.balanceOf(address);
-        return ethers.formatUnits(balance, 6); // USDC has 6 decimals
-    }
+        console.log(`[ESCROW] Relayer creating trade on ${chain}...`);
+        const tx = await contract.createTradeByRelayer(
+            seller,
+            buyer,
+            token,
+            amountUnits,
+            duration
+        );
 
-    /**
-     * Get escrow contract balance
-     */
-    async getEscrowBalance(): Promise<string> {
-        const escrow = this.getEscrowContract();
-        const balance = await escrow.getContractBalance(env.USDC_ADDRESS);
-        return ethers.formatUnits(balance, 6);
-    }
-
-    /**
-     * Get on-chain trade details
-     */
-    async getOnChainTrade(tradeId: number) {
-        const escrow = this.getEscrowContract();
-        const trade = await escrow.getTrade(tradeId);
-        return {
-            seller: trade.seller,
-            buyer: trade.buyer,
-            token: trade.token,
-            amount: ethers.formatUnits(trade.amount, 6),
-            feeAmount: ethers.formatUnits(trade.feeAmount, 6),
-            buyerReceives: ethers.formatUnits(trade.buyerReceives, 6),
-            status: Number(trade.status),
-            createdAt: Number(trade.createdAt),
-            deadline: Number(trade.deadline),
-            fiatSentAt: Number(trade.fiatSentAt),
-            autoReleaseDeadline: Number(trade.autoReleaseDeadline),
-        };
-    }
-
-    /**
-     * Check if a trade has expired
-     */
-    async isTradeExpired(tradeId: number): Promise<boolean> {
-        const escrow = this.getEscrowContract();
-        return await escrow.isExpired(tradeId);
-    }
-
-    /**
-     * Calculate fee for an amount
-     */
-    async calculateFee(amount: number): Promise<{ fee: string; net: string }> {
-        const escrow = this.getEscrowContract();
-        const amountWei = ethers.parseUnits(amount.toString(), 6);
-        const [fee, net] = await escrow.calculateFee(amountWei);
-        return {
-            fee: ethers.formatUnits(fee, 6),
-            net: ethers.formatUnits(net, 6),
-        };
-    }
-
-    // ═══════════════════════════════════════
-    //        WRITE FUNCTIONS (Relayer)
-    // ═══════════════════════════════════════
-
-    /**
-     * Release escrowed funds to buyer (called by relayer/bot)
-     */
-    async release(onChainTradeId: number): Promise<string> {
-        const escrow = this.getEscrowContract();
-        const tx = await escrow.release(onChainTradeId);
         const receipt = await tx.wait();
-        return receipt.hash;
+
+        for (const log of receipt.logs) {
+            try {
+                const parsed = contract.interface.parseLog(log);
+                if (parsed && parsed.name === "TradeCreated") {
+                    const tradeId = parsed.args.tradeId.toString();
+                    console.log(`[ESCROW] Trade created on-chain! ID: ${tradeId}`);
+                    return tradeId;
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        throw new Error("TradeCreated event not found in receipt");
     }
 
     /**
-     * Refund escrowed funds to seller
+     * Release funds to buyer (called by Relayer when Seller confirms)
      */
-    async refund(onChainTradeId: number): Promise<string> {
-        const escrow = this.getEscrowContract();
-        const tx = await escrow.refund(onChainTradeId);
-        const receipt = await tx.wait();
-        return receipt.hash;
-    }
-
-    /**
-     * Auto-release to buyer (when seller ghosts after fiat sent)
-     */
-    async autoRelease(onChainTradeId: number): Promise<string> {
-        const escrow = this.getEscrowContract();
-        const tx = await escrow.autoRelease(onChainTradeId);
-        const receipt = await tx.wait();
-        return receipt.hash;
-    }
-
-    /**
-     * Resolve a dispute (admin only)
-     */
-    async resolveDispute(onChainTradeId: number, releaseToBuyer: boolean): Promise<string> {
-        const escrow = this.getEscrowContract();
-        const tx = await escrow.resolveDispute(onChainTradeId, releaseToBuyer);
-        const receipt = await tx.wait();
-        return receipt.hash;
-    }
-
-    // ═══════════════════════════════════════
-    //          EVENT LISTENERS
-    // ═══════════════════════════════════════
-
-    /**
-     * Listen for escrow events (for real-time updates)
-     */
-    onTradeCreated(callback: (tradeId: number, seller: string, buyer: string, amount: string) => void) {
-        const escrow = this.getEscrowContract();
-        escrow.on("TradeCreated", (tradeId, seller, buyer, _token, amount) => {
-            callback(Number(tradeId), seller, buyer, ethers.formatUnits(amount, 6));
-        });
-    }
-
-    onTradeReleased(callback: (tradeId: number, buyer: string, amount: string) => void) {
-        const escrow = this.getEscrowContract();
-        escrow.on("TradeReleased", (tradeId, buyer, buyerReceives) => {
-            callback(Number(tradeId), buyer, ethers.formatUnits(buyerReceives, 6));
-        });
-    }
-
-    onAutoReleased(callback: (tradeId: number, buyer: string, amount: string) => void) {
-        const escrow = this.getEscrowContract();
-        escrow.on("AutoReleased", (tradeId, buyer, buyerReceives) => {
-            callback(Number(tradeId), buyer, ethers.formatUnits(buyerReceives, 6));
-        });
-    }
-
-    /**
-     * Get the explorer URL for a transaction
-     */
-    getExplorerUrl(txHash: string): string {
-        const base = env.IS_TESTNET
-            ? "https://sepolia.basescan.org"
-            : "https://basescan.org";
-        return `${base}/tx/${txHash}`;
+    async release(tradeId: string | number, chain: Chain = 'base'): Promise<string> {
+        const contract = this.getEscrowContract(chain);
+        console.log(`[ESCROW] Releasing trade ${tradeId} on ${chain}...`);
+        const tx = await contract.release(tradeId);
+        await tx.wait();
+        console.log(`[ESCROW] Released: ${tx.hash}`);
+        return tx.hash;
     }
 }
 

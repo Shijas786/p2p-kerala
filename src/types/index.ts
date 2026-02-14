@@ -64,6 +64,7 @@ export interface Order {
     payment_details: Record<string, any>;
     status: "active" | "paused" | "filled" | "cancelled" | "expired";
     filled_amount: number;
+    expires_at?: string | null;
     created_at: string;
     // Joined data
     username?: string;

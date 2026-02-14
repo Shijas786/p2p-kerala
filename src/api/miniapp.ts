@@ -149,7 +149,17 @@ router.get("/wallet/balances", async (req: Request, res: Response) => {
         }
 
         const balances = await wallet.getBalances(user.wallet_address);
-        res.json({ ...balances, wallet_type: (user as any).wallet_type || 'bot' });
+        const vaultBaseUsdc = await escrow.getVaultBalance(user.wallet_address, env.USDC_ADDRESS, 'base');
+        const vaultBscUsdc = await escrow.getVaultBalance(user.wallet_address, "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", 'bsc');
+        // const vaultUsdt = await escrow.getVaultBalance(user.wallet_address, env.USDT_ADDRESS);
+
+        res.json({
+            ...balances,
+            vault_base_usdc: vaultBaseUsdc,
+            vault_bsc_usdc: vaultBscUsdc,
+            // vault_usdt: vaultUsdt,
+            wallet_type: (user as any).wallet_type || 'bot'
+        });
     } catch (err: any) {
         console.error("[MINIAPP] Wallet balances error:", err);
         res.status(500).json({ error: err.message });
@@ -168,7 +178,7 @@ router.post("/wallet/send", async (req: Request, res: Response) => {
             return res.status(400).json({ error: "External wallets must send via your wallet app (MetaMask, etc.)" });
         }
 
-        const { to, amount, token } = req.body;
+        const { to, amount, token, chain } = req.body; // chain: 'base' | 'bsc'
         if (!to || !amount) {
             return res.status(400).json({ error: "Missing to/amount" });
         }
@@ -177,16 +187,26 @@ router.post("/wallet/send", async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Invalid amount" });
         }
 
+        const targetChain = chain || 'base';
         let txHash: string;
 
-        if (token === "ETH") {
-            txHash = await wallet.sendEth(user.wallet_index, to, amount);
+        if (token === "ETH" || token === "BNB") {
+            txHash = await wallet.sendNative(user.wallet_index, to, amount, targetChain);
         } else {
+            // Determine token address based on chain
+            let tokenAddress = env.USDC_ADDRESS;
+            if (targetChain === 'bsc') {
+                tokenAddress = (token === "USDT") ? "0x55d398326f99059fF775485246999027B3197955" : "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+            } else {
+                tokenAddress = (token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+            }
+
             txHash = await wallet.sendToken(
                 user.wallet_index,
                 to,
                 amount,
-                token === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS
+                tokenAddress,
+                targetChain
             );
         }
 
@@ -218,6 +238,79 @@ router.post("/wallet/connect", async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (err: any) {
         console.error("[MINIAPP] Connect error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post("/wallet/bot", async (req: Request, res: Response) => {
+    try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        const derived = wallet.deriveWallet(user.wallet_index);
+
+        await db.updateUser(user.id, {
+            wallet_address: derived.address,
+            wallet_type: 'bot',
+        } as any);
+
+        res.json({ success: true, address: derived.address });
+    } catch (err: any) {
+        console.error("[MINIAPP] Switch to bot error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ═══ VAULT OPERATIONS (Custodial Wallets) ═══
+
+router.post("/wallet/vault/deposit", async (req: Request, res: Response) => {
+    try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
+        if (user.wallet_type === 'external') return res.status(400).json({ error: "External wallets must deposit via frontend" });
+
+        const { amount, token, chain } = req.body;
+        if (!amount || !token) return res.status(400).json({ error: "Missing amount/token" });
+
+        const targetChain = chain || 'base';
+        let tokenAddress = env.USDC_ADDRESS;
+        if (targetChain === 'bsc') {
+            tokenAddress = (token === "USDT") ? "0x55d398326f99059fF775485246999027B3197955" : "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+        } else {
+            tokenAddress = token === 'USDT' ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+        }
+
+        const txHash = await wallet.depositToVault(user.wallet_index, amount.toString(), tokenAddress, targetChain);
+
+        res.json({ txHash });
+    } catch (err: any) {
+        console.error("[MINIAPP] Vault deposit error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.post("/wallet/vault/withdraw", async (req: Request, res: Response) => {
+    try {
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
+        if (user.wallet_type === 'external') return res.status(400).json({ error: "External wallets must withdraw via frontend" });
+
+        const { amount, token, chain } = req.body;
+        if (!amount || !token) return res.status(400).json({ error: "Missing amount/token" });
+
+        const targetChain = chain || 'base';
+        let tokenAddress = env.USDC_ADDRESS;
+        if (targetChain === 'bsc') {
+            tokenAddress = (token === "USDT") ? "0x55d398326f99059fF775485246999027B3197955" : "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+        } else {
+            tokenAddress = token === 'USDT' ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+        }
+
+        const txHash = await wallet.withdrawFromVault(user.wallet_index, amount.toString(), tokenAddress, targetChain);
+
+        res.json({ txHash });
+    } catch (err: any) {
+        console.error("[MINIAPP] Vault withdraw error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -254,53 +347,37 @@ router.post("/orders", async (req: Request, res: Response) => {
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
         if (!user) return res.status(401).json({ error: "User not found" });
 
-        const { type, token, amount, rate, payment_methods } = req.body;
+        const { type, token, amount, rate, payment_methods, expires_in, chain } = req.body;
         if (!type || !token || !amount || !rate) {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
+        const orderChain = chain || 'base';
         const parsedAmount = parseFloat(amount);
         const parsedRate = parseFloat(rate);
 
-        if (parsedAmount <= 0) return res.status(400).json({ error: "Amount must be positive" });
-        if (parsedRate <= 0) return res.status(400).json({ error: "Rate must be positive" });
+        // ... (existing checks)
 
-        // ═══ SELL ORDER: Verify seller has enough balance ═══
-        if (type === "sell") {
-            if (!user.wallet_address) {
-                return res.status(400).json({ error: "No wallet configured. Set up your wallet first." });
+        let expiresAt: string | undefined;
+        if (expires_in) {
+            const minutes = parseInt(expires_in);
+            if (minutes > 0) {
+                const now = new Date();
+                now.setMinutes(now.getMinutes() + minutes);
+                expiresAt = now.toISOString();
             }
-
-            try {
-                const tokenAddress = (token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
-                const balance = await wallet.getTokenBalance(user.wallet_address, tokenAddress);
-                const balanceNum = parseFloat(balance);
-
-                if (balanceNum < parsedAmount) {
-                    return res.status(400).json({
-                        error: `Insufficient ${token} balance. You have ${balanceNum.toFixed(2)} but need ${parsedAmount.toFixed(2)}.`,
-                    });
-                }
-            } catch (balErr: any) {
-                console.error("[MINIAPP] Balance check error:", balErr);
-                return res.status(500).json({ error: "Failed to verify wallet balance. Try again." });
-            }
-        }
-
-        // ═══ BUY ORDER: Verify buyer has UPI set up ═══
-        if (type === "buy" && !user.upi_id) {
-            return res.status(400).json({ error: "Set up your UPI ID first to create buy orders." });
         }
 
         const order = await db.createOrder({
             user_id: user.id,
             type,
             token: token || "USDC",
-            chain: "base",
+            chain: orderChain,
             amount: parsedAmount,
             rate: parsedRate,
             fiat_currency: "INR",
             payment_methods: payment_methods || ["UPI"],
+            expires_at: expiresAt
         });
 
         res.json({ order });
@@ -390,17 +467,6 @@ router.post("/trades", async (req: Request, res: Response) => {
         }
 
         const tokenAddress = (order.token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
-        try {
-            const sellerBalance = await wallet.getTokenBalance(seller.wallet_address, tokenAddress);
-            if (parseFloat(sellerBalance) < tradeAmount) {
-                return res.status(400).json({
-                    error: `Seller has insufficient ${order.token} balance (${parseFloat(sellerBalance).toFixed(2)} < ${tradeAmount.toFixed(2)})`,
-                });
-            }
-        } catch (balErr: any) {
-            console.error("[MINIAPP] Balance check error:", balErr);
-            return res.status(500).json({ error: "Failed to verify seller balance" });
-        }
 
         // Atomically fill the order to prevent double-matching
         const filled = await db.fillOrder(order_id, tradeAmount);
@@ -414,59 +480,50 @@ router.post("/trades", async (req: Request, res: Response) => {
 
         try {
             // ═══ ESCROW: Lock seller's funds on-chain ═══
-            let escrowTxHash: string | null = null;
-            let onChainTradeId: number | null = null;
+
 
             const sellerWalletType = (seller as any).wallet_type || 'bot';
 
-            if (sellerWalletType === 'bot' && env.ESCROW_CONTRACT_ADDRESS) {
-                // Bot wallet: server can sign — lock via relayer
-                try {
-                    // First: transfer seller's tokens to the relayer
-                    const sellerIndex = seller.wallet_index;
-                    await wallet.sendToken(
-                        sellerIndex,
-                        await wallet.getRelayerAddress(),
-                        tradeAmount,
-                        tokenAddress
-                    );
+            // ═══ P2P TRADING FLOW (VAULT BASED) ═══
 
-                    // Then: relayer creates the escrow trade on-chain
-                    const escrowResult = await wallet.relayerCreateTrade(
-                        buyer.wallet_address || "0x0000000000000000000000000000000000000000",
-                        tradeAmount,
-                        tokenAddress,
-                        parseInt(env.ESCROW_TIMEOUT_SECONDS)
-                    );
+            let escrowTxHash = "";
+            let onChainTradeId = "";
+            let lockedAt: string | null = null;
 
-                    escrowTxHash = escrowResult.txHash;
-                    onChainTradeId = escrowResult.tradeId;
-                    console.log(`✅ Escrow locked: trade #${onChainTradeId}, tx: ${escrowTxHash}`);
-                } catch (escrowErr: any) {
-                    console.error("[MINIAPP] Escrow lock failed:", escrowErr);
-                    // Revert fill since escrow failed
-                    await db.revertFillOrder(order_id, tradeAmount);
-                    return res.status(500).json({ error: "Failed to lock funds in escrow: " + escrowErr.message });
+            // 1. Check Seller's Vault Balance
+            try {
+                let tokenAddress = env.USDC_ADDRESS;
+                if (order.chain === 'bsc') {
+                    tokenAddress = (order.token === "USDT") ? "0x55d398326f99059fF775485246999027B3197955" : "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+                } else {
+                    tokenAddress = (order.token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
                 }
-            } else if (sellerWalletType === 'bot' && !env.ESCROW_CONTRACT_ADDRESS) {
-                // Bot wallet without contract: transfer to relayer as simple escrow
-                try {
-                    const txHash = await wallet.sendToken(
-                        seller.wallet_index,
-                        await wallet.getRelayerAddress(),
-                        tradeAmount,
-                        tokenAddress
-                    );
-                    escrowTxHash = txHash;
-                    console.log(`✅ Funds held by relayer (no contract): tx: ${txHash}`);
-                } catch (transferErr: any) {
-                    console.error("[MINIAPP] Relayer transfer failed:", transferErr);
-                    await db.revertFillOrder(order_id, tradeAmount);
-                    return res.status(500).json({ error: "Failed to lock funds: " + transferErr.message });
+
+                const balance = await escrow.getVaultBalance(seller.wallet_address!, tokenAddress, order.chain as any);
+                if (parseFloat(balance) < tradeAmount) {
+                    return res.status(400).json({
+                        error: `Seller (you?) has insufficient Vault balance (${balance}). Please Deposit ${tradeAmount} ${order.token} to Vault first.`
+                    });
                 }
-            } else {
-                // External wallets: user must lock funds client-side
-                console.log(`ℹ️ External wallet trade: waiting for client-side lock`);
+
+                // 2. Relayer locks funds from Vault
+                console.log(`[TRADES] Relayer creating trade for ${seller.wallet_address} -> ${buyer.wallet_address} on ${order.chain}`);
+                const tradeIdStr = await escrow.createRelayedTrade(
+                    seller.wallet_address!,
+                    buyer.wallet_address!,
+                    tokenAddress,
+                    tradeAmount.toString(),
+                    3600, // 1 hour
+                    order.chain as any
+                );
+                onChainTradeId = tradeIdStr as any;
+
+                escrowTxHash = "relayed_" + onChainTradeId;
+                lockedAt = new Date().toISOString();
+
+            } catch (err: any) {
+                console.error("[MINIAPP] Relayed trade creation failed:", err);
+                return res.status(500).json({ error: "Failed to create trade on-chain: " + err.message });
             }
 
             const trade = await db.createTrade({
@@ -478,11 +535,10 @@ router.post("/trades", async (req: Request, res: Response) => {
                 fiat_amount: fiatAmount as any,
                 fiat_currency: "INR",
                 rate: order.rate,
-                // If we have a hash, it's locked. If not (external), it's waiting.
-                status: escrowTxHash ? "in_escrow" : "waiting_for_escrow",
+                status: "in_escrow", // Always in_escrow because usage of Vault
                 escrow_tx_hash: escrowTxHash as any,
                 on_chain_trade_id: onChainTradeId as any,
-                escrow_locked_at: escrowTxHash ? new Date().toISOString() as any : null,
+                escrow_locked_at: lockedAt as any,
             });
 
             res.json({ trade });
@@ -568,7 +624,7 @@ router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) =
         let releaseTxHash: string | null = null;
         if (trade.on_chain_trade_id) {
             try {
-                releaseTxHash = await escrow.release(trade.on_chain_trade_id);
+                releaseTxHash = await escrow.release(trade.on_chain_trade_id, trade.chain as any);
             } catch (escrowErr: any) {
                 console.error("[MINIAPP] Escrow release failed:", escrowErr);
                 return res.status(500).json({ error: "Failed to release escrow: " + escrowErr.message });

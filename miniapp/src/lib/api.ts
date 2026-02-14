@@ -57,7 +57,7 @@ export const api = {
 
     // ---- Wallet ----
     wallet: {
-        getBalances: () => request<{ eth: string; usdc: string; usdt: string; address: string }>('/wallet/balances'),
+        getBalances: () => request<{ eth: string; usdc: string; usdt: string; address: string; vault_usdc?: string; wallet_type?: string }>('/wallet/balances'),
         send: (data: { to: string; amount: number; token: string }) =>
             request<{ txHash: string }>('/wallet/send', {
                 method: 'POST',
@@ -68,6 +68,17 @@ export const api = {
                 method: 'POST',
                 body: JSON.stringify({ address }),
             }),
+        connectBot: () => request<{ success: boolean; address: string }>('/wallet/bot', { method: 'POST' }),
+        depositToVault: (amount: number, token: string) =>
+            request<{ txHash: string }>('/wallet/vault/deposit', {
+                method: 'POST',
+                body: JSON.stringify({ amount, token }),
+            }),
+        withdrawFromVault: (amount: number, token: string) =>
+            request<{ txHash: string }>('/wallet/vault/withdraw', {
+                method: 'POST',
+                body: JSON.stringify({ amount, token }),
+            }),
     },
 
     // ---- Orders ----
@@ -77,6 +88,7 @@ export const api = {
         create: (data: {
             type: 'buy' | 'sell';
             token: string;
+            chain?: string;
             amount: number;
             rate: number;
             payment_methods: string[];

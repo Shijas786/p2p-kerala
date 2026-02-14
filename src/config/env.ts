@@ -18,10 +18,12 @@ const envSchema = z.object({
 
     // Blockchain
     ESCROW_CONTRACT_ADDRESS: z.string().default(""),
+    ESCROW_CONTRACT_ADDRESS_BSC: z.string().default(""),
     ADMIN_WALLET_ADDRESS: z.string().default(""),
     RELAYER_PRIVATE_KEY: z.string().default(""),
     MASTER_WALLET_SEED: z.string().default(""),
     BASE_RPC_URL: z.string().default("https://sepolia.base.org"),
+    BSC_RPC_URL: z.string().default("https://bsc-dataseed.binance.org/"),
     USDC_ADDRESS: z.string().default("0x036CbD53842c5426634e7929541eC2318f3dCF7e"),
     USDT_ADDRESS: z.string().default("0xfde4C96c8593536E31F229EA8f37b2ADa2699bb2"), // Axelar Wrapped USDT
 

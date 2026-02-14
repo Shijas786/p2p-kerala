@@ -38,6 +38,7 @@ create table public.orders (
   payment_details jsonb default '{}'::jsonb, -- e.g. { "upi": "user@okicici", "group_id": -100123 }
   status text not null default 'active',
   filled_amount numeric default 0,
+  expires_at timestamp with time zone, -- Auto-cancel time
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

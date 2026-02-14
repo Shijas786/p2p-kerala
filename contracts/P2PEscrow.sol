@@ -99,6 +99,9 @@ contract P2PEscrow is Ownable, ReentrancyGuard {
     /// @notice All trades: tradeId => Trade
     mapping(uint256 => Trade) public trades;
 
+    /// @notice Vault balances: User => Token => Amount
+    mapping(address => mapping(address => uint256)) public balances;
+
     /// @notice Approved tokens (e.g., USDC)
     mapping(address => bool) public approvedTokens;
 
@@ -120,6 +123,9 @@ contract P2PEscrow is Ownable, ReentrancyGuard {
     // ═══════════════════════════════════════════════════════════════
     //                          EVENTS
     // ═══════════════════════════════════════════════════════════════
+
+    event Deposit(address indexed user, address indexed token, uint256 amount);
+    event Withdraw(address indexed user, address indexed token, uint256 amount);
 
     event TradeCreated(
         uint256 indexed tradeId,
@@ -203,6 +209,80 @@ contract P2PEscrow is Ownable, ReentrancyGuard {
 
         emit TokenApproved(_usdc, true);
         emit FeeCollectorUpdated(address(0), _feeCollector);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //                     VAULT FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Deposit funds into the vault
+     */
+    function deposit(address _token, uint256 _amount) external nonReentrant {
+        require(approvedTokens[_token], "Token not approved");
+        require(_amount > 0, "Amount must be > 0");
+        IERC20(_token).safeTransferFrom(msg.sender, address(this), _amount);
+        balances[msg.sender][_token] += _amount;
+        emit Deposit(msg.sender, _token, _amount);
+    }
+
+    /**
+     * @notice Withdraw unused funds
+     */
+    function withdraw(address _token, uint256 _amount) external nonReentrant {
+        require(balances[msg.sender][_token] >= _amount, "Insufficient vault balance");
+        balances[msg.sender][_token] -= _amount;
+        IERC20(_token).safeTransfer(msg.sender, _amount);
+        emit Withdraw(msg.sender, _token, _amount);
+    }
+
+    /**
+     * @notice Relayer creates a trade using Seller's Vault funds (Match)
+     */
+    function createTradeByRelayer(
+        address _seller,
+        address _buyer,
+        address _token,
+        uint256 _amount,
+        uint256 _duration
+    ) external nonReentrant returns (uint256 tradeId) {
+        // Only Fee Collector (Relayer) or Owner can match trades
+        require(msg.sender == feeCollector || msg.sender == owner(), "Caller not Relayer");
+        require(_buyer != address(0), "Invalid buyer");
+        require(_seller != _buyer, "Self trade");
+        require(_amount >= MIN_TRADE_AMOUNT, "Too small");
+        require(balances[_seller][_token] >= _amount, "Insufficient seller vault balance");
+        require(activeTradeCount[_seller] < maxActiveTradesPerUser, "Too many trades");
+
+        balances[_seller][_token] -= _amount;
+
+        if (_duration == 0) _duration = DEFAULT_ESCROW_DURATION;
+        require(_duration <= MAX_ESCROW_DURATION, "Too long");
+
+        uint256 feeAmount = (_amount * feeBps) / 10000;
+        uint256 buyerReceives = _amount - feeAmount;
+
+        tradeCounter++;
+        tradeId = tradeCounter;
+
+        trades[tradeId] = Trade({
+            seller: _seller,
+            buyer: _buyer,
+            token: _token,
+            amount: _amount,
+            feeAmount: feeAmount,
+            buyerReceives: buyerReceives,
+            status: TradeStatus.Active,
+            createdAt: block.timestamp,
+            deadline: block.timestamp + _duration,
+            fiatSentAt: 0,
+            autoReleaseDeadline: 0,
+            disputeInitiator: address(0),
+            disputeReason: ""
+        });
+
+        activeTradeCount[_seller]++;
+        emit TradeCreated(tradeId, _seller, _buyer, _token, _amount, feeAmount, block.timestamp + _duration);
     }
 
     // ═══════════════════════════════════════════════════════════════

@@ -1,4 +1,4 @@
-import { useState, useEffect, Component, ReactNode } from 'react';
+import { useState, useEffect, useRef, Component, ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { WagmiProvider } from 'wagmi';
 import { useAccount } from 'wagmi';
@@ -77,6 +77,10 @@ function AppInner() {
   const [connecting, setConnecting] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
 
+  // Track if we've already tried to auto-login to external wallet
+  // This prevents an infinite loop when the user explicitly clicks "Switch Wallet"
+  const autoSelectAttempted = useRef(false);
+
   useEffect(() => {
     setupTelegramApp();
   }, []);
@@ -84,7 +88,8 @@ function AppInner() {
   // Only auto-skip selector for returning EXTERNAL wallet users
   // Bot wallet users always see the selector so they can switch to WalletConnect
   useEffect(() => {
-    if (user && !walletChosen && !connecting && !loading) {
+    if (user && !walletChosen && !connecting && !loading && !autoSelectAttempted.current) {
+      autoSelectAttempted.current = true;
       if (user.wallet_address && user.wallet_type === 'external') {
         console.log('[P2P] Returning external wallet user:', user.wallet_address);
         setWalletMode('external');
@@ -147,8 +152,18 @@ function AppInner() {
     return (
       <WalletSelector
         onSelectBot={() => {
-          setWalletMode('bot');
-          setWalletChosen(true);
+          setConnecting(true);
+          api.wallet.connectBot()
+            .then(() => refreshUser())
+            .then(() => {
+              setWalletMode('bot');
+              setWalletChosen(true);
+              setConnecting(false);
+            })
+            .catch(err => {
+              console.error(err);
+              setConnecting(false);
+            });
         }}
         onSelectExternal={async () => {
           setWalletMode('external');
