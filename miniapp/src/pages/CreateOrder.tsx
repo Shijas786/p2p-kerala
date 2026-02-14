@@ -42,16 +42,17 @@ export function CreateOrder() {
     const tokenAddress = (CONTRACTS as any)[chain]?.tokens[token];
     const isExternalUser = user?.wallet_type === 'external';
     const escrowAddress = (CONTRACTS as any)[chain]?.escrow;
+    const effectiveAddress = (isExternalUser ? address : user?.wallet_address) as `0x${string}` | undefined;
 
     // 1. Check Vault Balance
     const { data: vaultBalance, isLoading: loadingVault } = useReadContract({
         address: escrowAddress,
         abi: ESCROW_ABI,
         functionName: 'balances',
-        args: address && tokenAddress ? [address, tokenAddress] : undefined,
+        args: effectiveAddress && tokenAddress ? [effectiveAddress, tokenAddress] : undefined,
         chainId: targetChainId,
         query: {
-            enabled: !!address && !!tokenAddress && !!escrowAddress && type === 'sell'
+            enabled: !!effectiveAddress && !!tokenAddress && !!escrowAddress && type === 'sell'
         }
     });
 
@@ -63,7 +64,7 @@ export function CreateOrder() {
         args: address && escrowAddress ? [address, escrowAddress] : undefined,
         chainId: targetChainId,
         query: {
-            enabled: !!address && !!tokenAddress && !!escrowAddress && type === 'sell'
+            enabled: !!address && !!tokenAddress && !!escrowAddress && type === 'sell' && isExternalUser
         }
     });
 
@@ -74,14 +75,14 @@ export function CreateOrder() {
         bsc: ['USDC', 'USDT']
     };
 
-    const needsDeposit = type === 'sell' && isExternalUser && vaultBalance !== undefined && amount &&
+    const needsDeposit = type === 'sell' && vaultBalance !== undefined && amount &&
         parseFloat(formatUnits(vaultBalance as bigint, decimals)) < parseFloat(amount);
 
-    const needsApproval = needsDeposit && allowance !== undefined && amount &&
+    const needsApproval = needsDeposit && isExternalUser && allowance !== undefined && amount &&
         parseFloat(formatUnits(allowance as bigint, decimals)) < parseFloat(amount);
 
-    // Guard: Wait for balance info if external, AND wait for connection if we know we are an external user
-    const isDataLoading = (type === 'sell' && isExternalUser) && (loadingVault || loadingAllowance || !isConnected);
+    // Guard: Wait for balance info if sell, AND wait for connection if we know we are an external user
+    const isDataLoading = (type === 'sell') && (loadingVault || (isExternalUser && (loadingAllowance || !isConnected)));
 
     function toggleMethod(m: string) {
         haptic('selection');
@@ -387,6 +388,12 @@ export function CreateOrder() {
             )}
 
             {/* Error */}
+            {needsDeposit && !isExternalUser && (
+                <div className="co-error animate-fade-in" style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
+                    <span className="mr-1">💳</span> Insufficient Vault Balance. Please deposit {amount} {token} to your Vault in the Wallet page before publishing.
+                </div>
+            )}
+
             {error && (
                 <div className="co-error animate-fade-in">
                     <span className="mr-1">⚠️</span> {error}
@@ -406,8 +413,8 @@ export function CreateOrder() {
                     </button>
                 ) : (
                     <button
-                        className={`btn flex-1 ${needsDeposit ? 'btn-warn' : 'btn-primary'}`}
-                        onClick={submit}
+                        className={`btn flex-1 ${needsDeposit ? (isExternalUser ? 'btn-warn' : 'btn-secondary') : 'btn-primary'}`}
+                        onClick={isExternalUser || !needsDeposit ? submit : () => navigate('/wallet')}
                         disabled={submitting || isDataLoading}
                     >
                         {submitting ? (
@@ -425,7 +432,7 @@ export function CreateOrder() {
                                 <span className="text-xs uppercase font-bold">Checking Vault...</span>
                             </div>
                         ) : (
-                            needsDeposit ? `Deposit & Publish` : '✅ Publish Ad'
+                            needsDeposit ? (isExternalUser ? `Deposit & Publish` : 'Go to Wallet to Deposit') : '✅ Publish Ad'
                         )}
                     </button>
                 )}

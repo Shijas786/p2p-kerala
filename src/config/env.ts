@@ -33,7 +33,7 @@ const envSchema = z.object({
 
     // App Config
     FEE_BPS: z.string().default("50"),
-    DEFAULT_CHAIN: z.string().default("base-sepolia"),
+    DEFAULT_CHAIN: z.string().default("base"),
     DEFAULT_TOKEN: z.string().default("USDC"),
     ESCROW_TIMEOUT_SECONDS: z.string().default("3600"),
     AUTO_RELEASE_SECONDS: z.string().default("2700"),
