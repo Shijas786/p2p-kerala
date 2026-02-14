@@ -64,7 +64,7 @@ function AppInner() {
   }
 
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <Routes>
         <Route element={<Layout />}>
           <Route index element={<Home user={user} />} />
