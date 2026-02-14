@@ -81,19 +81,16 @@ function AppInner() {
     setupTelegramApp();
   }, []);
 
-  // Auto-detect returning users who already have a wallet configured
+  // Only auto-skip selector for returning EXTERNAL wallet users
+  // Bot wallet users always see the selector so they can switch to WalletConnect
   useEffect(() => {
     if (user && !walletChosen && !connecting && !loading) {
       if (user.wallet_address && user.wallet_type === 'external') {
         console.log('[P2P] Returning external wallet user:', user.wallet_address);
         setWalletMode('external');
         setWalletChosen(true);
-      } else if (user.wallet_address && user.wallet_type === 'bot') {
-        console.log('[P2P] Returning bot wallet user:', user.wallet_address);
-        setWalletMode('bot');
-        setWalletChosen(true);
       }
-      // If wallet_address is null, show selector
+      // Bot wallet users and new users see the selector
     }
   }, [user, walletChosen, connecting, loading]);
 
