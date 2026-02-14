@@ -74,20 +74,31 @@ function AppInner() {
   const { address, isConnected } = useAccount();
   const [walletChosen, setWalletChosen] = useState(false);
   const [walletMode, setWalletMode] = useState<'bot' | 'external' | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     setupTelegramApp();
   }, []);
 
   // When external wallet connects via WalletConnect, save it to backend
+  // This fires AFTER appKit modal connects — walletChosen is still false
   useEffect(() => {
-    if (walletMode === 'external' && isConnected && address) {
-      // Update the user's wallet address in the backend
+    if (walletMode === 'external' && isConnected && address && !walletChosen) {
+      setConnecting(true);
       api.wallet.connectExternal(address)
         .then(() => refreshUser())
-        .catch((err) => console.error('Failed to save wallet:', err));
+        .then(() => {
+          setWalletChosen(true);
+          setConnecting(false);
+        })
+        .catch((err) => {
+          console.error('Failed to save wallet:', err);
+          setConnecting(false);
+          // Still show app even if save fails
+          setWalletChosen(true);
+        });
     }
-  }, [isConnected, address, walletMode]);
+  }, [isConnected, address, walletMode, walletChosen]);
 
   if (loading) {
     return (
@@ -95,6 +106,17 @@ function AppInner() {
         <div className="logo">P2P KERALA</div>
         <div className="spinner spinner-lg" />
         <span className="text-xs text-muted">Initializing...</span>
+      </div>
+    );
+  }
+
+  // Show connecting state while saving external wallet
+  if (connecting) {
+    return (
+      <div className="loading-screen">
+        <div className="logo">P2P KERALA</div>
+        <div className="spinner spinner-lg" />
+        <span className="text-xs text-muted">Connecting wallet...</span>
       </div>
     );
   }
@@ -109,9 +131,9 @@ function AppInner() {
         }}
         onSelectExternal={async () => {
           setWalletMode('external');
-          // Open Reown/WalletConnect modal
+          // Open Reown/WalletConnect modal — don't set walletChosen yet!
+          // walletChosen will be set by the useEffect above after address is saved
           await appKit.open();
-          setWalletChosen(true);
         }}
       />
     );
