@@ -184,8 +184,8 @@ function AppInner() {
           <Route index element={<Home user={user} />} />
           <Route path="market" element={<Market />} />
           <Route path="create" element={<CreateOrder />} />
-          <Route path="trade/:id" element={<TradeDetail />} />
-          <Route path="trade/new/:orderId" element={<TradeDetail />} />
+          <Route path="trade/:id" element={<TradeDetail user={user} />} />
+          <Route path="trade/new/:orderId" element={<TradeDetail user={user} />} />
           <Route path="wallet" element={<Wallet user={user} />} />
           <Route path="bridge" element={<Bridge />} />
           <Route path="profile" element={<Profile user={user} onUpdate={refreshUser} onSwitchWallet={handleSwitchWallet} />} />

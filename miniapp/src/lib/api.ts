@@ -107,6 +107,11 @@ export const api = {
                 method: 'POST',
                 body: JSON.stringify({ reason }),
             }),
+        lock: (id: string, txHash: string) =>
+            request<{ trade: any }>(`/trades/${id}/lock`, {
+                method: 'POST',
+                body: JSON.stringify({ txHash }),
+            }),
         getById: (id: string) => request<{ trade: any }>(`/trades/${id}`),
     },
 

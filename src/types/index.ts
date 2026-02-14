@@ -7,6 +7,7 @@
 export type TradeStatus =
     | "created"
     | "matched"
+    | "waiting_for_escrow"
     | "in_escrow"
     | "fiat_sent"
     | "fiat_confirmed"

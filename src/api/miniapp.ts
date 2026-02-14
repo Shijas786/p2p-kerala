@@ -267,13 +267,6 @@ router.post("/orders", async (req: Request, res: Response) => {
 
         // ═══ SELL ORDER: Verify seller has enough balance ═══
         if (type === "sell") {
-            // Block external wallets from selling (server cannot lock their funds)
-            if ((user as any).wallet_type === 'external') {
-                return res.status(400).json({
-                    error: "External wallets cannot create sell ads yet. Please use the Bot Wallet to sell, or just Buy from others."
-                });
-            }
-
             if (!user.wallet_address) {
                 return res.status(400).json({ error: "No wallet configured. Set up your wallet first." });
             }
@@ -471,23 +464,22 @@ router.post("/trades", async (req: Request, res: Response) => {
                     await db.revertFillOrder(order_id, tradeAmount);
                     return res.status(500).json({ error: "Failed to lock funds: " + transferErr.message });
                 }
+            } else {
+                // External wallets: user must lock funds client-side
+                console.log(`ℹ️ External wallet trade: waiting for client-side lock`);
             }
-            // External wallets: escrow locking is skipped (must be done client-side)
 
             const trade = await db.createTrade({
-                order_id: order.id,
-                buyer_id: buyerId,
-                seller_id: sellerId,
-                token: order.token,
-                chain: order.chain,
+                order_id,
+                seller_id: seller.id,
+                buyer_id: buyer.id,
                 amount: tradeAmount,
+                token: order.token,
+                fiat_amount: fiatAmount as any,
+                fiat_currency: "INR",
                 rate: order.rate,
-                fiat_amount: fiatAmount,
-                fiat_currency: order.fiat_currency,
-                fee_amount: feeAmount,
-                buyer_receives: buyerReceives,
-                payment_method: ((order.payment_methods as string[]) || [])[0] as any || "UPI",
-                status: escrowTxHash ? "in_escrow" : "matched",
+                // If we have a hash, it's locked. If not (external), it's waiting.
+                status: escrowTxHash ? "in_escrow" : "waiting_for_escrow",
                 escrow_tx_hash: escrowTxHash as any,
                 on_chain_trade_id: onChainTradeId as any,
                 escrow_locked_at: escrowTxHash ? new Date().toISOString() as any : null,
@@ -501,6 +493,42 @@ router.post("/trades", async (req: Request, res: Response) => {
         }
     } catch (err: any) {
         console.error("[MINIAPP] Create trade error:", err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ═══ LOCK FUNDS (External Wallets) ═══
+router.post("/trades/:id/lock", async (req: Request, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const { txHash, tradeId } = req.body as { txHash: string; tradeId?: string }; // on-chain trade ID if available
+        const user = await db.getUserByTelegramId(req.telegramUser!.id);
+
+        if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+        const trade = await db.getTradeById(id);
+        if (!trade) return res.status(404).json({ error: "Trade not found" });
+
+        // Only seller can lock funds
+        if (trade.seller_id !== user.id) {
+            return res.status(403).json({ error: "Only the seller can lock funds" });
+        }
+
+        if (trade.status !== "waiting_for_escrow" && trade.status !== "matched") {
+            return res.status(400).json({ error: "Trade is not waiting for lock" });
+        }
+
+        await db.updateTrade(id, {
+            status: "in_escrow",
+            escrow_tx_hash: txHash,
+            on_chain_trade_id: tradeId ? parseInt(tradeId) : undefined,
+            escrow_locked_at: new Date().toISOString(),
+        });
+
+        const updated = await db.getTradeById(id);
+        res.json(updated);
+    } catch (err: any) {
+        console.error("[MINIAPP] Lock confirm error:", err);
         res.status(500).json({ error: err.message });
     }
 });
