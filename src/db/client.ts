@@ -130,7 +130,7 @@ class Database {
         const db = this.getClient();
         let query = db
             .from("orders")
-            .select("*, users!inner(username, trust_score, completed_trades)")
+            .select("*, users!inner(username, trust_score, completed_trades, wallet_address)")
             .eq("status", "active")
             .order("rate", { ascending: type === "sell" })
             .limit(limit);
@@ -154,6 +154,7 @@ class Database {
             ...d,
             username: d.users?.username,
             trust_score: d.users?.trust_score,
+            wallet_address: d.users?.wallet_address,
         })) as Order[];
     }
 

@@ -157,6 +157,48 @@ class EscrowService {
         console.log(`[ESCROW] Released: ${tx.hash}`);
         return tx.hash;
     }
+
+    /**
+     * Batch validate seller balances for a list of orders.
+     * Returns a Set of Order IDs that are invalid (insufficient balance).
+     */
+    async validateSellerBalances(orders: any[]): Promise<Set<string>> {
+        const invalidOrderIds = new Set<string>();
+
+        // Group by chain to parallelize efficiently? 
+        // For now, just map all to promises.
+
+        await Promise.all(orders.map(async (order) => {
+            if (!order.wallet_address || order.type !== 'sell') return;
+
+            try {
+                let tokenAddress = "";
+                if (order.chain === 'bsc') {
+                    tokenAddress = (order.token === "USDT") ? "0x55d398326f99059fF775485246999027B3197955" : "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d";
+                } else {
+                    tokenAddress = (order.token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+                }
+
+                const balanceStr = await this.getVaultBalance(order.wallet_address, tokenAddress, order.chain);
+                const balance = parseFloat(balanceStr);
+
+                // This check is simplistic (order vs total balance). 
+                // Ideally we should sum up all orders for a user and compare vs balance.
+                // But for "ghost ad" detection, if balance < order.amount, it's definitely invalid.
+
+                if (balance < order.amount) {
+                    invalidOrderIds.add(order.id);
+                }
+            } catch (err) {
+                console.error(`[ESCROW] Failed to validate order ${order.id}:`, err);
+                // If we can't check, we usually default to safe? or risky? 
+                // Let's assume safe for network errors, but maybe invalidIds is safer if we want strictness.
+                // For now, let's not block on RPC errors to avoid downtime.
+            }
+        }));
+
+        return invalidOrderIds;
+    }
 }
 
 export const escrow = new EscrowService();

@@ -353,7 +353,26 @@ router.post("/wallet/vault/withdraw", async (req: Request, res: Response) => {
 router.get("/orders", async (req: Request, res: Response) => {
     try {
         const type = req.query.type as string | undefined;
-        const orders = await db.getActiveOrders(type, undefined, 20);
+        // Increase limit slightly to account for filtered items
+        const rawOrders = await db.getActiveOrders(type, undefined, 30);
+
+        // JIT LIQUIDITY CHECK (Batch)
+        // Only check sell orders where reliability is critical
+        let orders = rawOrders;
+        if (type === 'sell' || !type) {
+            const sellOrders = rawOrders.filter(o => o.type === 'sell');
+            if (sellOrders.length > 0) {
+                const invalidIds = await escrow.validateSellerBalances(sellOrders);
+                if (invalidIds.size > 0) {
+                    console.log(`[Orders] Filtering ${invalidIds.size} ghost ads:`, Array.from(invalidIds));
+                    orders = rawOrders.filter(o => !invalidIds.has(o.id));
+
+                    // Optional: Trigger background cleanup for these invalid ads?
+                    // For now, just hide them. The background job will kill them eventually.
+                }
+            }
+        }
+
         res.json({ orders });
     } catch (err: any) {
         console.error("[MINIAPP] Orders error:", err);
