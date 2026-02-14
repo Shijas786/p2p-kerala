@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useReadContract, useWriteContract, useSwitchChain } from 'wagmi';
 import { waitForTransactionReceipt } from '@wagmi/core';
@@ -75,8 +75,21 @@ export function CreateOrder() {
         bsc: ['USDC', 'USDT']
     };
 
+    const [reserved, setReserved] = useState(0);
+    useEffect(() => {
+        if (type === 'sell') {
+            api.wallet.getBalances().then(data => {
+                const res = chain === 'base' ? data.vault_base_reserved : data.vault_bsc_reserved;
+                setReserved(parseFloat(res || '0'));
+            }).catch(console.error);
+        }
+    }, [type, chain]);
+
+    const physicalBalance = vaultBalance !== undefined ? parseFloat(formatUnits(vaultBalance as bigint, decimals)) : 0;
+    const availableBalance = physicalBalance - reserved;
+
     const needsDeposit = type === 'sell' && vaultBalance !== undefined && amount &&
-        parseFloat(formatUnits(vaultBalance as bigint, decimals)) < parseFloat(amount);
+        availableBalance < parseFloat(amount);
 
     const needsApproval = needsDeposit && isExternalUser && allowance !== undefined && amount &&
         parseFloat(formatUnits(allowance as bigint, decimals)) < parseFloat(amount);
