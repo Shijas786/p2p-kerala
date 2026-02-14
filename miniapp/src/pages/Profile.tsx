@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { haptic } from '../lib/telegram';
-import { IconPhone, IconLock, IconInfo, IconCheck, IconWarning } from '../components/Icons';
+import { IconPhone, IconLock, IconInfo, IconCheck, IconWarning, IconMarket, IconArrowRight } from '../components/Icons';
+import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 
 interface Props {
@@ -11,7 +12,10 @@ interface Props {
 }
 
 export function Profile({ user, onUpdate, onSwitchWallet }: Props) {
+    const navigate = useNavigate();
     const [upiInput, setUpiInput] = useState(user?.upi_id || '');
+    // ... (rest of the component until return)
+    // I'll use multi_replace to be cleaner since I'm changing imports and return
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
@@ -84,6 +88,22 @@ export function Profile({ user, onUpdate, onSwitchWallet }: Props) {
                         }
                     </span>
                     <span className="label">Verified</span>
+                </div>
+            </div>
+
+            {/* My Ads Quick Link */}
+            <div className="p-section card tappable" onClick={() => { haptic('light'); navigate('/my-ads'); }}>
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-icon-circle bg-blue">
+                            <IconMarket size={20} color="var(--blue)" />
+                        </div>
+                        <div>
+                            <h3 className="mb-0">My Ads</h3>
+                            <p className="text-xs text-muted mb-0">View and manage your active listings</p>
+                        </div>
+                    </div>
+                    <IconArrowRight size={20} color="var(--text-muted)" />
                 </div>
             </div>
 
