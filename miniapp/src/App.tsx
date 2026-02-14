@@ -30,13 +30,6 @@ function AppInner() {
     setupTelegramApp();
   }, []);
 
-  // Check if user has a wallet set up already
-  useEffect(() => {
-    if (user?.wallet_address) {
-      setWalletChosen(true);
-    }
-  }, [user]);
-
   if (loading) {
     return (
       <div className="loading-screen">
@@ -47,8 +40,8 @@ function AppInner() {
     );
   }
 
-  // Show wallet selector if no wallet is set
-  if (!walletChosen && !user?.wallet_address) {
+  // Always show wallet selector first
+  if (!walletChosen) {
     return (
       <WalletSelector
         onSelectBot={() => {
