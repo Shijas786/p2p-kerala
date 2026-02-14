@@ -248,13 +248,20 @@ export function TradeDetail({ user }: Props) {
         }
     }
 
+    const [utr, setUtr] = useState('');
+
     async function confirmPayment() {
         if (!id) return;
+        if (!/^\d{12}$/.test(utr)) {
+            setError('Please enter a valid 12-digit UTR/Reference number.');
+            haptic('error');
+            return;
+        }
         haptic('medium');
         setActionLoading(true);
         setError('');
         try {
-            await api.trades.confirmPayment(id);
+            await api.trades.confirmPayment(id, utr);
             haptic('success');
             await loadTrade();
         } catch (err: any) {
@@ -264,6 +271,10 @@ export function TradeDetail({ user }: Props) {
             setActionLoading(false);
         }
     }
+
+    // ... inside return ...
+    // Update Trade Info Section with UTR if exists
+    // Update Actions section with UTR input for buyer
 
     async function confirmReceipt() {
         if (!id) return;
@@ -412,14 +423,20 @@ export function TradeDetail({ user }: Props) {
 
             {/* Normal Trade Info (Status, etc) */}
             <div className="td-info card">
-                {/* ... existing info rows ... */}
                 <div className="td-info-row">
                     <span className="text-muted">Status</span>
-                    <span className="font-semibold">{trade.status.replace('_', ' ').toUpperCase()}</span>
+                    <span className={`font-semibold status-badge ${trade.status}`}>
+                        {trade.status.replace('_', ' ').toUpperCase()}
+                    </span>
                 </div>
-                {/* ... */}
+                {trade.payment_proofs?.[0]?.utr && (
+                    <div className="td-info-row border-t pt-2 mt-2">
+                        <span className="text-muted">Submitted UTR</span>
+                        <span className="font-mono font-bold text-lg select-all">{trade.payment_proofs[0].utr}</span>
+                    </div>
+                )}
                 {trade.escrow_tx_hash && (
-                    <div className="td-info-row">
+                    <div className="td-info-row border-t pt-2 mt-2">
                         <span className="text-muted">Escrow TX</span>
                         <a href={`https://basescan.org/tx/${trade.escrow_tx_hash}`} target="_blank" rel="noopener" className="text-green text-sm font-mono truncate">
                             {trade.escrow_tx_hash.slice(0, 12)}...
@@ -431,23 +448,68 @@ export function TradeDetail({ user }: Props) {
             {/* Standard Actions (Fiat Sent, Release, Dispute) */}
             <div className="td-actions">
                 {trade.status === 'in_escrow' && !isSeller && (
-                    <button
-                        className="btn btn-primary btn-block btn-lg"
-                        onClick={confirmPayment}
-                        disabled={actionLoading}
-                    >
-                        {actionLoading ? <span className="spinner" /> : '💸 I Sent Fiat'}
-                    </button>
+                    <div className="card-glass border-green p-3 animate-in">
+                        <h4 className="mb-2 text-sm font-bold uppercase tracking-wider">📤 Confirm Transfer</h4>
+                        <p className="text-xs text-muted mb-3">Paste the 12-digit UTR/Reference number from your banking app below.</p>
+
+                        <div className="utr-input-group mb-3">
+                            <input
+                                type="text"
+                                placeholder="Enter 12-digit UTR"
+                                value={utr}
+                                onChange={(e) => setUtr(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                className="utr-input font-mono"
+                                maxLength={12}
+                            />
+                        </div>
+
+                        <button
+                            className="btn btn-primary btn-block btn-lg"
+                            onClick={confirmPayment}
+                            disabled={actionLoading || utr.length < 12}
+                        >
+                            {actionLoading ? <span className="spinner" /> : '💸 I Sent Fiat'}
+                        </button>
+                    </div>
                 )}
+
                 {trade.status === 'fiat_sent' && isSeller && (
-                    <button
-                        className="btn btn-primary btn-block btn-lg"
-                        onClick={confirmReceipt}
-                        disabled={actionLoading}
-                    >
-                        {actionLoading ? <span className="spinner" /> : '✅ I Received Fiat — Release Crypto'}
-                    </button>
+                    <div className="card-glass border-orange p-3 animate-in">
+                        <h4 className="mb-1 text-sm font-bold uppercase tracking-wider text-orange">📢 Payment Reported</h4>
+                        <p className="text-xs text-muted mb-3">The buyer has submitted a UTR. Follow these steps to verify:</p>
+
+                        <div className="verification-steps mb-4">
+                            <div className="v-step">
+                                <span className="v-num">1</span>
+                                <span className="v-text">Open your bank/UPI app.</span>
+                            </div>
+                            <div className="v-step">
+                                <span className="v-num">2</span>
+                                <span className="v-text">Check for <b>₹{trade.fiat_amount}</b> from the buyer.</span>
+                            </div>
+                            <div className="v-step">
+                                <span className="v-num">3</span>
+                                <span className="v-text">Match the UTR: <b>{trade.payment_proofs?.[0]?.utr || 'Pending'}</b></span>
+                            </div>
+                        </div>
+
+                        <button
+                            className="btn btn-success btn-block btn-lg mb-2"
+                            onClick={confirmReceipt}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? <span className="spinner" /> : '✅ Confirm & Release Crypto'}
+                        </button>
+                    </div>
                 )}
+
+                {trade.status === 'fiat_sent' && !isSeller && (
+                    <div className="text-center p-4">
+                        <div className="loading-dots mb-2">Waiting for seller to release...</div>
+                        <p className="text-xs text-muted">The seller is verifying your UTR.</p>
+                    </div>
+                )}
+
                 {['in_escrow', 'fiat_sent'].includes(trade.status) && (
                     <button
                         className="btn btn-danger btn-block mt-2"
@@ -458,7 +520,7 @@ export function TradeDetail({ user }: Props) {
                     </button>
                 )}
                 {trade.status === 'completed' && (
-                    <div className="td-completed text-center">
+                    <div className="td-completed text-center animate-in">
                         <span className="td-check">🎉</span>
                         <h3 className="text-green">Trade Completed!</h3>
                         <p className="text-sm text-muted mt-1">Funds have been released successfully</p>

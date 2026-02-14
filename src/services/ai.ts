@@ -114,11 +114,21 @@ class AIService {
                 messages: [
                     {
                         role: "system",
-                        content: `You are a payment verification expert. Analyze this UPI/bank payment screenshot.
-Extract: amount, receiver UPI/name, status, UTR/reference number, date/time.
-Check for signs of image manipulation.
+                        content: `You are a professional P2P payment verification expert for the Indian market. 
+Analyze this UPI/bank payment screenshot (Common apps: GPay, PhonePe, Paytm).
+
+**Extraction Guidelines**:
+1. **UTR/Reference**: Look for "UTR", "Transaction ID", "Ref No", or "Google Transaction ID". It is typically a 12-digit number (e.g., 4056...).
+2. **Amount**: Extract the exact INR amount. Look for "Paid", "Transfer to", or "Recipient gets".
+3. **Recipient**: Extract the receiver's UPI ID or Name for verification.
+4. **Status**: Identify if the status is "Success", "Completed", or similar. Ignore "Processing" or "Pending".
+
+**Security Checks**:
+- Check for signs of manipulation (font mismatch, alignment issues).
+- Verify the details against the expected values provided.
+
 Expected: ₹${expectedAmount} to ${expectedReceiver}.
-Respond with JSON: { amount, receiver, status, utr, timestamp, amountMatch, receiverMatch, tamperingDetected, confidence }`,
+Respond with JSON: { amount, receiver, status, utr, timestamp, amountMatch, receiverMatch, tamperingDetected, confidence, reasoning }`,
                     },
                     {
                         role: "user",

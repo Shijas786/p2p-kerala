@@ -8,8 +8,21 @@ import { env } from "../config/env";
 import { db } from "../db/client";
 import { wallet } from "../services/wallet";
 import { escrow } from "../services/escrow";
+import { bot } from "../bot";
 
 const router = Router();
+
+// Helper for trade notifications
+async function notifyTradeUpdate(userId: string, message: string) {
+    try {
+        const user = await db.getUserById(userId);
+        if (user && user.telegram_id) {
+            await bot.api.sendMessage(user.telegram_id, message, { parse_mode: "HTML" });
+        }
+    } catch (err) {
+        console.error("[NOTIFY] Failed to send notification:", err);
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════
 //  TELEGRAM INIT DATA VALIDATION MIDDLEWARE
@@ -151,13 +164,16 @@ router.get("/wallet/balances", async (req: Request, res: Response) => {
         const balances = await wallet.getBalances(user.wallet_address);
         const vaultBaseUsdc = await escrow.getVaultBalance(user.wallet_address, env.USDC_ADDRESS, 'base');
         const vaultBscUsdc = await escrow.getVaultBalance(user.wallet_address, "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", 'bsc');
-        // const vaultUsdt = await escrow.getVaultBalance(user.wallet_address, env.USDT_ADDRESS);
+
+        const reservedBase = await db.getReservedAmount(user.id, 'USDC', 'base');
+        const reservedBsc = await db.getReservedAmount(user.id, 'USDC', 'bsc');
 
         res.json({
             ...balances,
             vault_base_usdc: vaultBaseUsdc,
             vault_bsc_usdc: vaultBscUsdc,
-            // vault_usdt: vaultUsdt,
+            vault_base_reserved: reservedBase.toString(),
+            vault_bsc_reserved: reservedBsc.toString(),
             wallet_type: (user as any).wallet_type || 'bot'
         });
     } catch (err: any) {
@@ -384,10 +400,16 @@ router.post("/orders", async (req: Request, res: Response) => {
             }
 
             // Check if user has enough funds in Vault
-            const balance = await escrow.getVaultBalance(user.wallet_address!, tokenAddress, orderChain as any);
-            if (parseFloat(balance) < parsedAmount) {
+            const balanceStr = await escrow.getVaultBalance(user.wallet_address!, tokenAddress, orderChain as any);
+            const physicalBalance = parseFloat(balanceStr);
+
+            // Subtract reserved amounts from existing active sell ads
+            const reserved = await db.getReservedAmount(user.id, token, orderChain);
+            const available = physicalBalance - reserved;
+
+            if (available < parsedAmount) {
                 return res.status(400).json({
-                    error: `Insufficient Vault Balance! You have ${balance} ${token}. Deposit ${parsedAmount - parseFloat(balance)} more to Vault.`
+                    error: `Insufficient Available Vault Balance! You have ${physicalBalance} ${token}, but ${reserved} ${token} is already reserved for your other active ads. Available: ${available.toFixed(2)} ${token}.`
                 });
             }
         }
@@ -569,9 +591,25 @@ router.post("/trades", async (req: Request, res: Response) => {
                 escrow_tx_hash: escrowTxHash as any,
                 on_chain_trade_id: onChainTradeId as any,
                 escrow_locked_at: lockedAt as any,
+                chain: order.chain,
             });
 
             res.json({ trade });
+
+            // BACKGROUND NOTIFICATIONS
+            const coin = trade.token;
+            const amountStr = trade.amount;
+            const fiat = trade.fiat_amount;
+
+            // 1. Notify Seller
+            await notifyTradeUpdate(seller.id,
+                `🤝 <b>Trade Matched!</b>\n\nBuyer <b>${buyer.first_name || 'User'}</b> is ready to buy <b>${amountStr} ${coin}</b> for <b>₹${parseFloat(fiat.toString()).toLocaleString()}</b>.\n\nFunds are locked in Escrow. Please wait for payment UTR.`
+            );
+
+            // 2. Notify Buyer
+            await notifyTradeUpdate(buyer.id,
+                `💸 <b>Funds in Escrow!</b>\n\nYou are buying <b>${amountStr} ${coin}</b> from <b>${seller.first_name || 'User'}</b>.\n\nPlease transfer <b>₹${parseFloat(fiat.toString()).toLocaleString()}</b> to the seller's UPI and submit the UTR.`
+            );
         } catch (tradeErr) {
             // Revert the fill if trade creation fails
             await db.revertFillOrder(order_id, tradeAmount);
@@ -613,6 +651,13 @@ router.post("/trades/:id/lock", async (req: Request, res: Response) => {
 
         const updated = await db.getTradeById(id);
         res.json(updated);
+
+        // NOTIFY BUYER
+        if (updated) {
+            await notifyTradeUpdate(updated.buyer_id,
+                `🔒 <b>Seller Locked Funds!</b>\n\nSeller <b>${user.first_name || 'User'}</b> has locked the crypto in Escrow.\n\nYou can now safely transfer <b>₹${updated.fiat_amount}</b> and submit the UTR.`
+            );
+        }
     } catch (err: any) {
         console.error("[MINIAPP] Lock confirm error:", err);
         res.status(500).json({ error: err.message });
@@ -624,18 +669,46 @@ router.post("/trades/:id/confirm-payment", async (req: Request, res: Response) =
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
         if (!user) return res.status(401).json({ error: "User not found" });
 
+        const { utr } = req.body;
+        if (!utr || !/^\d{12}$/.test(utr)) {
+            return res.status(400).json({ error: "A valid 12-digit UTR/Reference number is required." });
+        }
+
         const trade = await db.getTradeById(req.params.id as string);
         if (!trade) return res.status(404).json({ error: "Trade not found" });
         if (trade.buyer_id !== user.id) return res.status(403).json({ error: "Only the buyer can confirm payment" });
         if (trade.status !== "in_escrow") return res.status(400).json({ error: "Trade not in escrow state" });
+
+        // Double-Proof Protection
+        const isUsed = await db.isUTRUsed(utr);
+        if (isUsed) {
+            return res.status(400).json({ error: "This UTR has already been used in another trade!" });
+        }
+
+        // Save proof
+        await db.savePaymentProof({
+            trade_id: trade.id,
+            user_id: user.id,
+            utr: utr,
+            amount: trade.fiat_amount,
+            receiver_upi: "", // Optionally fetch from seller if needed for logs
+            timestamp: new Date().toISOString(),
+        });
 
         await db.updateTrade(req.params.id as string, {
             status: "fiat_sent",
             fiat_sent_at: new Date().toISOString() as any,
             auto_release_at: new Date(Date.now() + parseInt(env.AUTO_RELEASE_SECONDS) * 1000).toISOString() as any,
         });
+
         res.json({ success: true });
+
+        // NOTIFY SELLER
+        await notifyTradeUpdate(trade.seller_id,
+            `💰 <b>Payment Reported!</b>\n\nBuyer <b>${user.first_name || 'User'}</b> has reported paying <b>₹${trade.fiat_amount}</b>.\n\nUTR: <code>${utr}</code>\n\n<b>Action Required:</b> Verify the payment in your bank app and release the crypto.`
+        );
     } catch (err: any) {
+        console.error("[MINIAPP] Confirm payment error:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -673,6 +746,11 @@ router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) =
         await db.completeUserTrade(trade.seller_id, true);
 
         res.json({ success: true, release_tx_hash: releaseTxHash });
+
+        // NOTIFY BUYER
+        await notifyTradeUpdate(trade.buyer_id,
+            `🎉 <b>Trade Completed!</b>\n\nSeller <b>${user.first_name || 'User'}</b> has released <b>${trade.amount} ${trade.token}</b> to your Vault.\n\nThank you for trading with P2P Kerala! 🚀`
+        );
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

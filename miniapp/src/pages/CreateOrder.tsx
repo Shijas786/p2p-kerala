@@ -223,122 +223,100 @@ export function CreateOrder() {
         <div className="page animate-in">
             <div className="page-header">
                 <h1 className="page-title">Create Ad</h1>
-                <p className="page-subtitle">Step {step} of 6</p>
+                <p className="page-subtitle text-muted">List your buy/sell order on the marketplace</p>
             </div>
 
-            {/* Progress */}
-            <div className="co-progress">
-                {[1, 2, 3, 4, 5, 6].map(s => (
-                    <div key={s} className={`co-dot ${s <= step ? 'active' : ''} ${s === step ? 'current' : ''}`} />
-                ))}
-            </div>
+            <div className="co-form-container">
+                {/* 1. Basic Info Section */}
+                <div className="co-section card-glass">
+                    <div className="co-section-title">1. Type & Network</div>
 
-            {/* Step 1: Type */}
-            {step === 1 && (
-                <div className="co-step animate-in">
-                    <h3 className="mb-3 text-center">What do you want to do?</h3>
-                    <div className="co-type-grid">
+                    <div className="flex gap-2 mb-3">
                         <button
-                            className={`co-type-btn ${type === 'sell' ? 'active sell' : ''}`}
+                            className={`btn-toggle-type flex-1 ${type === 'sell' ? 'active sell' : ''}`}
                             onClick={() => { haptic('selection'); setType('sell'); }}
                         >
-                            <span className="co-type-icon">🔴</span>
-                            <span className="co-type-label">SELL</span>
-                            <span className="co-type-desc">I have crypto, want INR</span>
+                            🔴 SELL
                         </button>
                         <button
-                            className={`co-type-btn ${type === 'buy' ? 'active buy' : ''}`}
+                            className={`btn-toggle-type flex-1 ${type === 'buy' ? 'active buy' : ''}`}
                             onClick={() => { haptic('selection'); setType('buy'); }}
                         >
-                            <span className="co-type-icon">🟢</span>
-                            <span className="co-type-label">BUY</span>
-                            <span className="co-type-desc">I have INR, want crypto</span>
+                            🟢 BUY
+                        </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <button
+                            className={`btn-toggle-net flex-1 ${chain === 'base' ? 'active' : ''}`}
+                            onClick={() => { setChain('base'); setToken('USDC'); }}
+                        >
+                            Base
+                        </button>
+                        <button
+                            className={`btn-toggle-net flex-1 ${chain === 'bsc' ? 'active' : ''}`}
+                            onClick={() => { setChain('bsc'); setToken('USDT'); }}
+                        >
+                            BSC
                         </button>
                     </div>
                 </div>
-            )}
 
-            {/* Step 2: Chain & Token */}
-            {step === 2 && (
-                <div className="co-step animate-in">
-                    <h3 className="mb-2">Select Network</h3>
-                    <div className="flex gap-2 mb-4">
-                        <button className={`btn btn-sm ${chain === 'base' ? 'btn-primary' : 'btn-secondary'} flex-1`} onClick={() => { setChain('base'); setToken('USDC'); }}>Base</button>
-                        <button className={`btn btn-sm ${chain === 'bsc' ? 'btn-primary' : 'btn-secondary'} flex-1`} onClick={() => { setChain('bsc'); setToken('USDT'); }}>BSC</button>
-                    </div>
+                {/* 2. Token & Amount Section */}
+                <div className="co-section card-glass">
+                    <div className="co-section-title">2. Token & Amount</div>
 
-                    <h3 className="mb-3">Select Token</h3>
-                    <div className="co-token-grid">
+                    <div className="co-token-row mb-3">
                         {TOKENS_BY_CHAIN[chain].map(t => (
                             <button
                                 key={t}
-                                className={`co-token-btn ${token === t ? 'active' : ''}`}
+                                className={`co-token-pill ${token === t ? 'active' : ''}`}
                                 onClick={() => { haptic('selection'); setToken(t); }}
                             >
-                                <span className="co-token-name font-mono">{t}</span>
-                                <span className="text-xs text-muted">{chain.toUpperCase()}</span>
+                                {t}
                             </button>
                         ))}
                     </div>
-                </div>
-            )}
 
-            {/* Step 3: Amount */}
-            {step === 3 && (
-                <div className="co-step animate-in">
-                    <h3 className="mb-3">How much {token}?</h3>
-                    <div className="co-input-wrap">
+                    <div className="co-input-group">
                         <input
                             type="number"
-                            placeholder="0.00"
+                            placeholder="Amount"
                             value={amount}
                             onChange={e => setAmount(e.target.value)}
-                            className="co-amount-input font-mono"
-                            autoFocus
+                            className="co-input-flat font-mono"
                         />
-                        <span className="co-input-suffix">{token}</span>
+                        <span className="co-input-label">{token}</span>
                     </div>
-                    <div className="co-presets grid-3">
-                        {['10', '50', '100'].map(p => (
-                            <button key={p} className="btn-preset" onClick={() => setAmount(p)}>{p}</button>
+
+                    <div className="co-presets-row mt-2">
+                        {['10', '50', '100', '500'].map(p => (
+                            <button key={p} className="btn-preset-sm" onClick={() => setAmount(p)}>{p}</button>
                         ))}
                     </div>
                 </div>
-            )}
 
-            {/* Step 4: Rate */}
-            {step === 4 && (
-                <div className="co-step animate-in">
-                    <h3 className="mb-3">INR rate per {token}</h3>
-                    <div className="co-input-wrap">
-                        <span className="co-input-prefix">₹</span>
+                {/* 3. Rate & Payment Section */}
+                <div className="co-section card-glass">
+                    <div className="co-section-title">3. Rate & Payment</div>
+
+                    <div className="co-input-group mb-3">
+                        <span className="co-input-label">₹</span>
                         <input
                             type="number"
-                            placeholder="88.00"
+                            placeholder="Rate (e.g. 88.50)"
                             value={rate}
                             onChange={e => setRate(e.target.value)}
-                            className="co-amount-input font-mono"
-                            autoFocus
+                            className="co-input-flat font-mono"
                         />
+                        <span className="co-input-label">/ {token}</span>
                     </div>
-                    {amount && rate && (
-                        <div className="co-total mt-3">
-                            <span className="label">Total Fiat</span>
-                            <span className="font-mono text-green font-bold">₹{parseFloat(fiatTotal).toLocaleString()}</span>
-                        </div>
-                    )}
-                </div>
-            )}
 
-            {/* Step 5: Payment */}
-            {step === 5 && (
-                <div className="co-step animate-in">
-                    <h3 className="mb-3">Payment Methods</h3>
-                    <div className="co-methods">
+                    <div className="co-payment-grid">
                         {PAYMENT_METHODS.map(m => (
                             <button
                                 key={m}
-                                className={`co-method-btn ${methods.includes(m) ? 'active' : ''}`}
+                                className={`co-method-chip ${methods.includes(m) ? 'active' : ''}`}
                                 onClick={() => toggleMethod(m)}
                             >
                                 {m}
@@ -346,126 +324,81 @@ export function CreateOrder() {
                         ))}
                     </div>
                 </div>
-            )}
 
-            {/* Step 6: Confirm */}
-            {step === 6 && (
-                <div className="co-step animate-in">
-                    <h3 className="mb-3">Confirm Your Ad</h3>
-                    <div className="co-summary card">
-                        <div className="co-summary-row">
-                            <span className="text-muted">Network</span>
-                            <span className="font-bold">{chain.toUpperCase()}</span>
-                        </div>
-                        <div className="co-summary-row">
-                            <span className="text-muted">Type</span>
-                            <span className={type === 'sell' ? 'text-red' : 'text-green'}>
-                                {type === 'sell' ? '🔴 SELL' : '🟢 BUY'}
+                {/* Summary Card */}
+                {amount && rate && (
+                    <div className="co-summary-mini card-glass glow-green">
+                        <div className="flex justify-between items-center">
+                            <span className="text-xs text-muted uppercase">Total Fiat</span>
+                            <span className="font-mono font-bold text-green text-lg">
+                                ₹{parseFloat(fiatTotal).toLocaleString()}
                             </span>
                         </div>
-                        <div className="co-summary-row">
-                            <span className="text-muted">Token</span>
-                            <span className="font-mono">{token}</span>
-                        </div>
-                        <div className="co-summary-row">
-                            <span className="text-muted">Amount</span>
-                            <span className="font-mono">{amount} {token}</span>
-                        </div>
-                        <div className="co-summary-row">
-                            <span className="text-muted">Rate</span>
-                            <span className="font-mono">₹{parseFloat(rate).toLocaleString()}</span>
-                        </div>
-                        <div className="co-summary-row border-t pt-2 mt-2">
-                            <span className="text-muted">Total (Approx)</span>
-                            <span className="font-mono font-bold text-green">₹{parseFloat(fiatTotal).toLocaleString()}</span>
-                        </div>
                     </div>
+                )}
 
-                    {/* Vault Check for Externals */}
-                    {type === 'sell' && isConnected && (
-                        <div className="co-vault-status card mt-3 border-green">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="text-xs text-muted uppercase">Vault Balance</span>
-                                <span className={`text-sm font-mono ${needsDeposit ? 'text-orange' : 'text-green'}`}>
-                                    {vaultBalance ? formatUnits(vaultBalance as bigint, decimals) : '0.00'} {token}
-                                </span>
-                            </div>
-                            {needsDeposit && (
-                                <p className="text-[10px] text-orange italic">
-                                    Insufficient balance. You will need to deposit during the final step.
-                                </p>
-                            )}
+                {/* Vault Monitoring (Sell Only) */}
+                {type === 'sell' && (
+                    <div className={`co-vault-box card-glass ${needsDeposit ? 'border-orange' : 'border-green'}`}>
+                        <div className="flex justify-between items-center text-xs">
+                            <span className="text-muted uppercase">Available Vault Balance</span>
+                            <span className={needsDeposit ? 'text-orange' : 'text-green'}>
+                                {vaultBalance !== undefined ? availableBalance.toFixed(2) : '...'} {token}
+                            </span>
                         </div>
-                    )}
-                </div>
-            )}
-
-            {/* Error */}
-            {needsDeposit && !isExternalUser && (
-                <div className="co-error animate-fade-in" style={{ background: 'rgba(234, 179, 8, 0.1)', color: '#eab308', border: '1px solid rgba(234, 179, 8, 0.2)' }}>
-                    <span className="mr-1">💳</span> Insufficient Vault Balance. Please deposit {amount} {token} to your Vault in the Wallet page before publishing.
-                </div>
-            )}
-
-            {error && (
-                <div className="co-error animate-fade-in">
-                    <span className="mr-1">⚠️</span> {error}
-                </div>
-            )}
-
-            {/* Navigation */}
-            <div className="co-nav">
-                {step > 1 && (
-                    <button className="btn btn-secondary flex-1" onClick={prevStep}>
-                        ← Back
-                    </button>
-                )}
-                {step < 6 ? (
-                    <button className="btn btn-primary flex-1" onClick={nextStep}>
-                        Next →
-                    </button>
-                ) : (
-                    <button
-                        className={`btn flex-1 ${needsDeposit ? (isExternalUser ? 'btn-warn' : 'btn-secondary') : 'btn-primary'}`}
-                        onClick={() => {
-                            if (isExternalUser) {
-                                if (!isConnected) {
-                                    appKit.open();
-                                } else {
-                                    submit();
-                                }
-                            } else {
-                                // Bot user
-                                if (needsDeposit) {
-                                    navigate('/wallet');
-                                } else {
-                                    submit();
-                                }
-                            }
-                        }}
-                        disabled={submitting || (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance)))}
-                    >
-                        {submitting ? (
-                            <div className="flex items-center gap-2 justify-center">
-                                <span className="spinner" />
-                                <span className="text-xs uppercase font-bold">
-                                    {txStep === 'approving' ? 'Approving...' :
-                                        txStep === 'depositing' ? 'Depositing...' :
-                                            txStep === 'creating' ? 'Publishing...' : 'Working...'}
-                                </span>
+                        {needsDeposit && (
+                            <div className="text-[10px] text-orange mt-1 italic">
+                                ⚠️ Insufficient balance. {isExternalUser ? 'Will deposit during publish.' : 'Deposit in Wallet first.'}
                             </div>
-                        ) : (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance))) ? (
-                            <div className="flex items-center gap-2 justify-center">
-                                <span className="spinner" />
-                                <span className="text-xs uppercase font-bold">Checking Vault...</span>
-                            </div>
-                        ) : (isExternalUser && !isConnected) ? (
-                            '🔌 Connect Wallet'
-                        ) : (
-                            needsDeposit ? (isExternalUser ? `Deposit & Publish` : 'Go to Wallet to Deposit') : '✅ Publish Ad'
                         )}
-                    </button>
+                    </div>
                 )}
+            </div>
+
+            {/* Error Display */}
+            {error && (
+                <div className="co-error-banner animate-shake">
+                    <span>⚠️</span> {error}
+                </div>
+            )}
+
+            {/* Final Action Button */}
+            <div className="co-action-footer">
+                <button
+                    className={`btn-publish ${needsDeposit && !isExternalUser ? 'disabled' : ''}`}
+                    onClick={() => {
+                        if (isExternalUser) {
+                            if (!isConnected) {
+                                appKit.open();
+                            } else {
+                                submit();
+                            }
+                        } else {
+                            if (needsDeposit) {
+                                navigate('/wallet');
+                            } else {
+                                submit();
+                            }
+                        }
+                    }}
+                    disabled={submitting || (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance)))}
+                >
+                    {submitting ? (
+                        <div className="flex items-center gap-2 justify-center">
+                            <span className="spinner-white" />
+                            <span>{txStep.toUpperCase()}...</span>
+                        </div>
+                    ) : (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance))) ? (
+                        <div className="flex items-center gap-2 justify-center">
+                            <span className="spinner-white" />
+                            <span>CHECKING BALANCE...</span>
+                        </div>
+                    ) : (isExternalUser && !isConnected) ? (
+                        '🔌 CONNECT WALLET'
+                    ) : (
+                        needsDeposit ? (isExternalUser ? `DEPOSIT & PUBLISH` : 'INSUFFICIENT BALANCE') : '🚀 PUBLISH AD'
+                    )}
+                </button>
             </div>
         </div>
     );

@@ -123,8 +123,11 @@ export const api = {
                 method: 'POST',
                 body: JSON.stringify({ order_id: orderId, amount }),
             }),
-        confirmPayment: (id: string) =>
-            request<{ success: boolean }>(`/trades/${id}/confirm-payment`, { method: 'POST' }),
+        confirmPayment: (id: string, utr: string) =>
+            request<{ success: boolean }>(`/trades/${id}/confirm-payment`, {
+                method: 'POST',
+                body: JSON.stringify({ utr }),
+            }),
         confirmReceipt: (id: string) =>
             request<{ success: boolean }>(`/trades/${id}/confirm-receipt`, { method: 'POST' }),
         dispute: (id: string, reason: string) =>

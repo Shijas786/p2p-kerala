@@ -184,6 +184,20 @@ class Database {
         return (data || []) as Order[];
     }
 
+    async getReservedAmount(userId: string, token: string, chain: string): Promise<number> {
+        const db = this.getClient();
+        const { data } = await db
+            .from("orders")
+            .select("amount, filled_amount")
+            .eq("user_id", userId)
+            .eq("type", "sell")
+            .eq("token", token)
+            .eq("chain", chain)
+            .eq("status", "active");
+
+        return (data || []).reduce((sum, order) => sum + (order.amount - (order.filled_amount || 0)), 0);
+    }
+
     async updateOrder(orderId: string, updates: Partial<Order>): Promise<void> {
         const db = this.getClient();
         await db
