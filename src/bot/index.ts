@@ -24,6 +24,15 @@ type BotContext = Context & { session: SessionData };
 
 const bot = new Bot<BotContext>(env.TELEGRAM_BOT_TOKEN);
 
+// GLOBAL DEBUG LOGGER
+bot.use(async (ctx, next) => {
+    // Log only if it's a message to avoid spamming other updates like poll answers/etc if not needed
+    if (ctx.message || ctx.channelPost) {
+        console.log(`[DEBUG] Update received: ${JSON.stringify(ctx.update, null, 2)}`);
+    }
+    await next();
+});
+
 // Session middleware
 bot.use(
     session({
@@ -250,6 +259,60 @@ bot.command("start", async (ctx) => {
         }
     }
 
+    // 🆕 HANDLE PRIVATE AD SETUP (Redirected from Group)
+    if (payload && (payload.startsWith("setup_sell_") || payload.startsWith("setup_buy_"))) {
+        const isSell = payload.startsWith("setup_sell_");
+        const data = payload.replace(isSell ? "setup_sell_" : "setup_buy_", "");
+        const parts = data.split("_");
+
+        // Format: AMOUNT_RATE_GROUPID
+        if (parts.length >= 3) {
+            const amount = parseFloat(parts[0]);
+            const rate = parseFloat(parts[1]);
+            const groupId = parseInt(parts[2]); // Capture Group ID
+            const user = await ensureUser(ctx);
+
+            if (!isNaN(amount) && !isNaN(rate)) {
+                // Initialize Draft Session
+                ctx.session.ad_draft = {
+                    type: isSell ? "sell" : "buy",
+                    amount: amount,
+                    rate: rate,
+                    token: "USDC",
+                    target_group_id: !isNaN(groupId) ? groupId : undefined
+                };
+
+                const callbackData = isSell
+                    ? `confirm_sell:${amount}:${rate}:${user.id}`
+                    : `confirm_buy:${amount}:${rate}:${user.id}`;
+
+                const keyboard = new InlineKeyboard()
+                    .text("✅ Confirm Order", callbackData)
+                    .text("❌ Cancel", `cancel_action:${user.id}`);
+
+                const feeAmt = amount * env.FEE_PERCENTAGE;
+                const typeLabel = isSell ? "Sell" : "Buy";
+
+                await ctx.reply(
+                    [
+                        `📝 *Create ${typeLabel} Order*`,
+                        "",
+                        `Amount: ${formatUSDC(amount)}`,
+                        `Rate: ${formatINR(rate)}/USDC`,
+                        `Total: ${formatINR(amount * rate)}`,
+                        `Fee (0.5%): ${formatUSDC(feeAmt)}`,
+                        // For sell orders show buyer receives, for buy orders show you pay
+                        isSell ? `Buyer receives: ${formatUSDC(amount - feeAmt)}` : `You receive: ${formatUSDC(amount - feeAmt)}`,
+                        "",
+                        " Confirm to list this order?",
+                    ].join("\n"),
+                    { parse_mode: "Markdown", reply_markup: keyboard }
+                );
+                return;
+            }
+        }
+    }
+
     // 2. Buy specific order
     if (payload && payload.startsWith("buy_")) {
         const orderId = payload.replace("buy_", "");
@@ -336,7 +399,7 @@ bot.command("start", async (ctx) => {
             const keyboard = new InlineKeyboard()
                 .text("📱 Set UPI Now", "setup_upi")
                 .row()
-                .text("⏭️ Skip for Now", "cancel_action");
+                .text("⏭️ Skip for Now", `cancel_action:${user.id}`);
 
             await ctx.reply(
                 [
@@ -385,7 +448,7 @@ bot.command("upi", async (ctx) => {
     if (user.upi_id) {
         const keyboard = new InlineKeyboard()
             .text("✏️ Change UPI", "setup_upi")
-            .text("✅ Keep Current", "cancel_action");
+            .text("✅ Keep Current", `cancel_action:${user.id}`);
 
         await ctx.reply(
             [
@@ -526,7 +589,7 @@ bot.command("send", async (ctx) => {
         .text("dt USDT", "send_token:USDT")
         .text("💎 ETH", "send_token:ETH")
         .row()
-        .text("❌ Cancel", "cancel_action");
+        .text("❌ Cancel", `cancel_action:${user.id}`);
 
     await ctx.reply(
         [
@@ -1221,10 +1284,17 @@ bot.on("callback_query:data", async (ctx) => {
             handled = true;
             try {
                 const parts = data.split(":");
-                if (parts.length < 3) throw new Error("Invalid callback data format");
+                if (parts.length < 4) throw new Error("Invalid callback data format (missing user_id)");
 
                 const amountStr = parts[1];
                 const rateStr = parts[2];
+                const creatorId = parseInt(parts[3]);
+
+                if (ctx.from.id !== creatorId) {
+                    await ctx.answerCallbackQuery({ text: "⚠️ Expected creator to confirm.", show_alert: true });
+                    return;
+                }
+
                 const amount = parseFloat(amountStr);
                 const rate = parseFloat(rateStr);
 
@@ -1240,9 +1310,9 @@ bot.on("callback_query:data", async (ctx) => {
                 };
 
                 const keyboard = new InlineKeyboard()
-                    .text("⚡ UPI", "ad_pay:upi")
-                    .text("🏦 Bank Transfer", "ad_pay:bank")
-                    .text("💳 All Methods", "ad_pay:all");
+                    .text("⚡ UPI", `ad_pay:upi:${creatorId}`)
+                    .text("🏦 Bank Transfer", `ad_pay:bank:${creatorId}`)
+                    .text("💳 All Methods", `ad_pay:all:${creatorId}`);
 
                 const text = [
                     "📢 *Create Sell Ad — Step 3/3*",
@@ -1270,10 +1340,18 @@ bot.on("callback_query:data", async (ctx) => {
             handled = true;
             try {
                 const parts = data.split(":");
-                if (parts.length < 3) throw new Error("Invalid callback data format");
+                // confirm_buy:AMOUNT:RATE:USERID
+                if (parts.length < 4) throw new Error("Invalid callback data format (missing user_id)");
 
                 const amountStr = parts[1];
                 const rateStr = parts[2];
+                const creatorId = parseInt(parts[3]);
+
+                if (ctx.from.id !== creatorId) {
+                    await ctx.answerCallbackQuery({ text: "⚠️ Expected creator to confirm.", show_alert: true });
+                    return;
+                }
+
                 const amount = parseFloat(amountStr);
                 const rate = parseFloat(rateStr);
 
@@ -1470,7 +1548,7 @@ bot.on("callback_query:data", async (ctx) => {
 
             const keyboard = new InlineKeyboard()
                 .text("✅ Start Trade", `confirm_trade:${orderId}`)
-                .text("❌ Cancel", "cancel_action");
+                .text("❌ Cancel", `cancel_action:${user.id}`);
 
             await ctx.editMessageText(
                 [
@@ -1498,72 +1576,24 @@ bot.on("callback_query:data", async (ctx) => {
 
         // ─────── AI INTENT CALLBACKS (Missing Handlers) ───────
 
-        if (data.startsWith("confirm_sell:")) {
-            const [_, amountStr, rateStr] = data.split(":");
-            const amount = parseFloat(amountStr);
-            const rate = parseFloat(rateStr);
 
-            ctx.session.ad_draft = {
-                type: "sell",
-                amount: amount,
-                rate: rate,
-                token: "USDC", // Default to USDC for AI flow
-                chain: "base"
-            };
-
-            const keyboard = new InlineKeyboard()
-                .text("UPI", "ad_pay:UPI")
-                .text("IMPS", "ad_pay:IMPS")
-                .text("NEFT", "ad_pay:NEFT")
-                .row()
-                .text("All Methods", "ad_pay:all");
-
-            await ctx.editMessageText(
-                [
-                    "💳 *Select Payment Method*",
-                    "",
-                    "How do you want to receive payment?",
-                ].join("\n"),
-                { parse_mode: "Markdown", reply_markup: keyboard }
-            );
-            await ctx.answerCallbackQuery();
-        }
-
-        if (data.startsWith("confirm_buy:")) {
-            const [_, amountStr, rateStr] = data.split(":");
-            const amount = parseFloat(amountStr);
-            const rate = parseFloat(rateStr);
-
-            ctx.session.ad_draft = {
-                type: "buy",
-                amount: amount,
-                rate: rate,
-                token: "USDC", // Default to USDC for AI flow
-                chain: "base"
-            };
-
-            const keyboard = new InlineKeyboard()
-                .text("UPI", "ad_pay:UPI")
-                .text("IMPS", "ad_pay:IMPS")
-                .text("NEFT", "ad_pay:NEFT")
-                .row()
-                .text("All Methods", "ad_pay:all");
-
-            await ctx.editMessageText(
-                [
-                    "💳 *Select Payment Method*",
-                    "",
-                    "How do you want to pay the seller?",
-                ].join("\n"),
-                { parse_mode: "Markdown", reply_markup: keyboard }
-            );
-            await ctx.answerCallbackQuery();
-        }
 
         // ─────── AD PAYMENT METHOD SELECTION (Final Step) ───────
 
         if (data.startsWith("ad_pay:")) {
-            const method = data.replace("ad_pay:", "");
+            const parts = data.split(":");
+            // Format: ad_pay:METHOD[:USERID]
+            const method = parts[1];
+
+            // Validate User if ID is present
+            if (parts.length >= 3) {
+                const creatorId = parseInt(parts[2]);
+                if (!isNaN(creatorId) && ctx.from.id !== creatorId) {
+                    await ctx.answerCallbackQuery({ text: "⚠️ This is not your ad draft.", show_alert: true });
+                    return;
+                }
+            }
+
             const user = await ensureUser(ctx);
             const draft = ctx.session.ad_draft;
 
@@ -1572,9 +1602,12 @@ bot.on("callback_query:data", async (ctx) => {
                 return;
             }
 
-            const paymentMethods = method === "all"
-                ? ["UPI", "IMPS", "NEFT"]
-                : [method.toUpperCase()];
+            let paymentMethods: string[] = [];
+            if (method === "all") {
+                paymentMethods = ["UPI", "IMPS", "NEFT", "PAYTM", "BANK"];
+            } else {
+                paymentMethods = [method.toUpperCase()];
+            }
 
             try {
                 // ═══ FOR SELL ADS: Check balance & lock USDC in escrow ═══
@@ -1589,28 +1622,64 @@ bot.on("callback_query:data", async (ctx) => {
                     const vaultBalance = await escrow.getVaultBalance(user.wallet_address!, tokenAddress);
                     const balanceNum = parseFloat(vaultBalance);
 
-                    if (balanceNum < amount) {
-                        await ctx.reply(
-                            [
-                                `❌ *Insufficient Vault Balance*`,
-                                "",
-                                `You want to sell: *${formatUSDC(amount, tokenSymbol)}*`,
-                                `Your Vault balance: *${formatUSDC(balanceNum, tokenSymbol)}*`,
-                                "",
-                                `📥 *To list this ad, you must first deposit funds to the Vault.*`,
-                                `You can do this via the /wallet menu or the Mini App.`,
-                                "",
-                                `_This ensures your ad is backed by real collateral._`,
-                            ].join("\n"),
-                            { parse_mode: "Markdown" }
-                        );
-                        ctx.session.ad_draft = undefined;
-                        await ctx.answerCallbackQuery();
-                        return;
+                    let fundingSource = "vault"; // 'vault' or 'hot_wallet'
+
+                    // 1. External Wallets: MUST have funds in Vault
+                    // (We cannot auto-deposit from external wallets without a signature at trade time)
+                    if (user.wallet_type === 'external') {
+                        if (balanceNum < amount) {
+                            await ctx.reply(
+                                [
+                                    `❌ *Insufficient Vault Balance*`,
+                                    "",
+                                    `Since you are using an External Wallet, you must deposit funds to the Vault *before* creating a Sell Ad.`,
+                                    "",
+                                    `Required: *${formatUSDC(amount, tokenSymbol)}*`,
+                                    `Vault Balance: *${formatUSDC(balanceNum, tokenSymbol)}*`,
+                                    "",
+                                    `📥 *Please deposit funds via the Mini App.*`,
+                                ].join("\n"),
+                                { parse_mode: "Markdown" }
+                            );
+                            ctx.session.ad_draft = undefined;
+                            await ctx.answerCallbackQuery();
+                            return;
+                        }
+                        fundingSource = "vault";
+                    }
+                    // 2. Bot Wallets: Can use Hot Wallet (Auto-Deposit)
+                    else {
+                        // Check Hot Wallet Balance as fallback
+                        const hotWalletBalance = await wallet.getTokenBalance(user.wallet_address!, tokenAddress);
+                        const hotBalanceNum = parseFloat(hotWalletBalance);
+
+                        if (balanceNum >= amount) {
+                            fundingSource = "vault";
+                        } else if (hotBalanceNum >= amount) {
+                            fundingSource = "hot_wallet";
+                        } else {
+                            // Neither has enough
+                            await ctx.reply(
+                                [
+                                    `❌ *Insufficient Balance*`,
+                                    "",
+                                    `You want to sell: *${formatUSDC(amount, tokenSymbol)}*`,
+                                    `Vault Balance: *${formatUSDC(balanceNum, tokenSymbol)}*`,
+                                    `Hot Wallet: *${formatUSDC(hotBalanceNum, tokenSymbol)}*`,
+                                    "",
+                                    `📥 *Please deposit funds to your wallet.*`,
+                                ].join("\n"),
+                                { parse_mode: "Markdown" }
+                            );
+                            ctx.session.ad_draft = undefined;
+                            await ctx.answerCallbackQuery();
+                            return;
+                        }
                     }
 
-                    // No need to manually "lock" now - it stays in Vault until matched
-                    const escrowTxHash = "vault_backed";
+                    // No need to manually "lock" now - it stays in Vault or Hot Wallet until matched
+                    const escrowTxHash = fundingSource === "vault" ? "vault_backed" : "hot_wallet_backed";
+
                     const token = draft.token! || "USDC";
 
                     const order = await db.createOrder({
@@ -1650,18 +1719,24 @@ bot.on("callback_query:data", async (ctx) => {
 
                     if (targetGroup !== undefined) {
                         // Post ONLY to that group
+                        const groupKeyboard = new InlineKeyboard()
+                            .url("⚡ Buy Now", `https://t.me/${botUser.username}?start=buy_${order.id}`);
+
                         await ctx.api.sendMessage(
                             String(targetGroup),
-                            `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👉 [Buy Now](https://t.me/${botUser.username}?start=buy_${order.id})`,
-                            { parse_mode: "Markdown" }
+                            `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👇 *Click below to buy:*`,
+                            { parse_mode: "Markdown", reply_markup: groupKeyboard }
                         ).catch(e => console.error(`Group Broadcast failed to ${targetGroup}:`, e));
 
                     } else if (env.BROADCAST_CHANNEL_ID) {
                         // Fallback: Post to Main Channel for Direct DM ads
+                        const channelKeyboard = new InlineKeyboard()
+                            .url("⚡ Buy Now", `https://t.me/${botUser.username}?start=buy_${order.id}`);
+
                         await ctx.api.sendMessage(
                             env.BROADCAST_CHANNEL_ID,
-                            `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👉 [Buy Now](https://t.me/${botUser.username}?start=buy_${order.id})`,
-                            { parse_mode: "Markdown" }
+                            `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👇 *Click below to buy:*`,
+                            { parse_mode: "Markdown", reply_markup: channelKeyboard }
                         ).catch(e => console.error("Main Channel Broadcast failed:", e));
                     }
 
@@ -1905,6 +1980,45 @@ bot.on("callback_query:data", async (ctx) => {
 
                     const tokenSymbol = order.token || "USDC";
                     const tokenAddress = tokenSymbol === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+
+                    // 🛠️ AUTO-DEPOSIT CHECK 🛠️
+                    // If Seller created ad using Hot Wallet, funds might not be in Vault yet.
+                    const vaultBalance = await escrow.getVaultBalance(seller.wallet_address!, tokenAddress);
+                    if (parseFloat(vaultBalance) < order.amount) {
+                        // ❌ External Wallets cannot auto-deposit since we don't have their private key
+                        if (seller.wallet_type === 'external') {
+                            await db.revertFillOrder(order.id, order.amount);
+                            await ctx.editMessageText(
+                                "❌ *Trade Failed*\n\nSeller (External Wallet) has insufficient Vault balance.\nFunds must be deposited to Vault manually via Mini App.",
+                                { parse_mode: "Markdown" }
+                            );
+                            return;
+                        }
+
+                        await ctx.editMessageText("⏳ Seller vault needs funding. Attempting auto-deposit...");
+
+                        // Check Hot Wallet
+                        const hotBalance = await wallet.getTokenBalance(seller.wallet_address!, tokenAddress);
+                        if (parseFloat(hotBalance) < order.amount) {
+                            await db.revertFillOrder(order.id, order.amount);
+                            await ctx.editMessageText("❌ Trade failed: Seller has insufficient funds!");
+                            return;
+                        }
+
+                        try {
+                            // Perform Deposit (Approve + Deposit)
+                            // This requires Seller to have ETH for gas
+                            await wallet.depositToVault(seller.wallet_index, order.amount.toString(), tokenAddress);
+                            await ctx.editMessageText("✅ Auto-Deposit successful. Locking funds...");
+                        } catch (err: any) {
+                            console.error("Auto-deposit failed:", err);
+                            await db.revertFillOrder(order.id, order.amount);
+                            await ctx.editMessageText(`❌ Trade failed: Auto-deposit failed (likely insufficient ETH for gas). Details: ${err.message}`);
+                            return;
+                        }
+                    }
+
+                    await ctx.editMessageText("⏳ Locking crypto in escrow contract...");
 
                     try {
                         // 3. Relayer creates trade on Smart Contract
@@ -2475,9 +2589,26 @@ bot.on("callback_query:data", async (ctx) => {
         }
 
         // Handle cancel
-        if (data === "cancel_action") {
-            await ctx.editMessageText("❌ Action cancelled.");
-            await ctx.answerCallbackQuery();
+        if (data.startsWith("cancel_action")) {
+            // Check for embedded user ID
+            if (data.includes(":")) {
+                const parts = data.split(":");
+                const creatorId = parseInt(parts[1]);
+                if (!isNaN(creatorId) && ctx.from.id !== creatorId) {
+                    await ctx.answerCallbackQuery({ text: "⚠️ Expected creator to cancel.", show_alert: true });
+                    return;
+                }
+            } else {
+                // Reject legacy buttons without ID
+                await ctx.answerCallbackQuery({ text: "⚠️ Action expired or invalid.", show_alert: true });
+                return;
+            }
+
+            await ctx.deleteMessage().catch(() => { });
+            ctx.session.ad_draft = undefined;
+            ctx.session.send_draft = undefined;
+            ctx.session.awaiting_input = undefined;
+            await ctx.answerCallbackQuery({ text: "Action cancelled." });
         }
 
         // Handle setup UPI button
@@ -2508,7 +2639,7 @@ bot.on("callback_query:data", async (ctx) => {
             const keyboard = new InlineKeyboard()
                 .text("⚠️ Yes, show my private key", "confirm_export")
                 .row()
-                .text("❌ Cancel", "cancel_action");
+                .text("❌ Cancel", `cancel_action:${user.id}`);
 
             await ctx.editMessageText(
                 [
@@ -2605,12 +2736,15 @@ bot.on("callback_query:data", async (ctx) => {
 
 bot.on("message:text", async (ctx) => {
     const text = ctx.message.text;
+    console.log(`[BOT] Received text: "${text}" from ${ctx.from.id} in ${ctx.chat.type} (${ctx.chat.id})`);
 
     // Skip commands
     if (text.startsWith("/")) return;
 
     const botInfo = await ctx.api.getMe();
     const botName = botInfo.username;
+    console.log(`[BOT] My username: ${botName}`);
+
     let cleanText = text;
 
     // Strip mention if present (e.g. "@MyBot sell 100") - Case Insensitive
@@ -2621,13 +2755,17 @@ bot.on("message:text", async (ctx) => {
             cleanText = text.replace(mentionRegex, "").trim();
         }
     }
+    console.log(`[BOT] Clean text: "${cleanText}"`);
 
     // In groups, ONLY reply if mentioned or replying to bot
     if (ctx.chat.type !== "private") {
         const isMentioned = botName ? new RegExp(`@${botName}`, "i").test(text) : false;
         const isReplyToBot = ctx.message.reply_to_message?.from?.id === botInfo.id;
 
+        console.log(`[BOT] Group logic - Mentioned: ${isMentioned}, ReplyToBot: ${isReplyToBot}`);
+
         if (!isMentioned && !isReplyToBot) {
+            console.log("[BOT] Ignoring non-mention in group");
             return; // Ignore random group chatter
         }
     }
@@ -2894,8 +3032,10 @@ bot.on("message:text", async (ctx) => {
         switch (intent.intent) {
             case "CREATE_SELL_ORDER":
                 if (intent.params.amount && intent.params.rate) {
-                    // We have enough info to create the order
-                    const callbackData = `confirm_sell:${intent.params.amount}:${intent.params.rate}`;
+
+
+                    // Secure callback with UserID
+                    const callbackData = `confirm_sell:${intent.params.amount}:${intent.params.rate}:${ctx.from.id}`;
                     console.log(`DEBUG: Creating SELL button with data: ${callbackData}`);
 
                     const keyboard = new InlineKeyboard()
@@ -2925,12 +3065,14 @@ bot.on("message:text", async (ctx) => {
 
             case "CREATE_BUY_ORDER":
                 if (intent.params.amount && intent.params.rate) {
-                    const callbackData = `confirm_buy:${intent.params.amount}:${intent.params.rate}`;
+
+
+                    const callbackData = `confirm_buy:${intent.params.amount}:${intent.params.rate}:${ctx.from.id}`;
                     console.log(`DEBUG: Creating BUY button with data: ${callbackData}`);
 
                     const keyboard = new InlineKeyboard()
                         .text("✅ Confirm Order", callbackData)
-                        .text("❌ Cancel", "cancel_action");
+                        .text("❌ Cancel", `cancel_action:${ctx.from.id}`);
 
                     await ctx.reply(
                         [
@@ -3015,7 +3157,7 @@ bot.on("message:text", async (ctx) => {
 
                         const keyboard = new InlineKeyboard()
                             .text("✅ Confirm & Send", "confirm_send")
-                            .text("❌ Cancel", "cancel_action");
+                            .text("❌ Cancel", `cancel_action:${ctx.from.id}`);
 
                         await ctx.reply(
                             [
