@@ -1451,6 +1451,70 @@ bot.on("callback_query:data", async (ctx) => {
             await ctx.answerCallbackQuery();
         }
 
+        // ─────── AI INTENT CALLBACKS (Missing Handlers) ───────
+
+        if (data.startsWith("confirm_sell:")) {
+            const [_, amountStr, rateStr] = data.split(":");
+            const amount = parseFloat(amountStr);
+            const rate = parseFloat(rateStr);
+
+            ctx.session.ad_draft = {
+                type: "sell",
+                amount: amount,
+                rate: rate,
+                token: "USDC", // Default to USDC for AI flow
+                chain: "base"
+            };
+
+            const keyboard = new InlineKeyboard()
+                .text("UPI", "ad_pay:UPI")
+                .text("IMPS", "ad_pay:IMPS")
+                .text("NEFT", "ad_pay:NEFT")
+                .row()
+                .text("All Methods", "ad_pay:all");
+
+            await ctx.editMessageText(
+                [
+                    "💳 *Select Payment Method*",
+                    "",
+                    "How do you want to receive payment?",
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+            await ctx.answerCallbackQuery();
+        }
+
+        if (data.startsWith("confirm_buy:")) {
+            const [_, amountStr, rateStr] = data.split(":");
+            const amount = parseFloat(amountStr);
+            const rate = parseFloat(rateStr);
+
+            ctx.session.ad_draft = {
+                type: "buy",
+                amount: amount,
+                rate: rate,
+                token: "USDC", // Default to USDC for AI flow
+                chain: "base"
+            };
+
+            const keyboard = new InlineKeyboard()
+                .text("UPI", "ad_pay:UPI")
+                .text("IMPS", "ad_pay:IMPS")
+                .text("NEFT", "ad_pay:NEFT")
+                .row()
+                .text("All Methods", "ad_pay:all");
+
+            await ctx.editMessageText(
+                [
+                    "💳 *Select Payment Method*",
+                    "",
+                    "How do you want to pay the seller?",
+                ].join("\n"),
+                { parse_mode: "Markdown", reply_markup: keyboard }
+            );
+            await ctx.answerCallbackQuery();
+        }
+
         // ─────── AD PAYMENT METHOD SELECTION (Final Step) ───────
 
         if (data.startsWith("ad_pay:")) {

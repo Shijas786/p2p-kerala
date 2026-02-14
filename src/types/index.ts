@@ -187,6 +187,7 @@ export interface SessionData {
         rate?: number;
         payment_methods?: string[];
         target_group_id?: number;
+        chain?: string;
     };
     send_draft?: {
         to_address?: string;
