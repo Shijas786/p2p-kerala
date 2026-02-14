@@ -2,28 +2,32 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    padding-bottom: 100px;
-    /* Space for fixed footer */
+    padding-bottom: 24px;
 }
 
 .co-section {
-    padding: 20px;
+    padding: 24px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .co-section-title {
-    font-size: 0.75rem;
-    font-weight: 700;
+    font-size: 0.7rem;
+    font-weight: 800;
     text-transform: uppercase;
     color: var(--text-muted);
-    letter-spacing: 0.05em;
-    margin-bottom: 16px;
+    letter-spacing: 0.1em;
+    margin-bottom: 12px;
+}
+
+.co-section-title:not(:first-child) {
+    margin-top: 20px;
 }
 
 /* Type Toggle */
 .btn-toggle-type {
-    padding: 12px;
+    padding: 14px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
@@ -48,12 +52,12 @@
 
 /* Network Toggle */
 .btn-toggle-net {
-    padding: 10px;
+    padding: 12px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
 }
 
@@ -61,24 +65,23 @@
     background: var(--primary);
     border-color: var(--primary);
     color: #fff;
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
 }
 
 /* Token Pills */
 .co-token-row {
     display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
+    gap: 10px;
 }
 
 .co-token-pill {
-    padding: 8px 16px;
+    flex: 1;
+    padding: 10px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--border);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-md);
     font-size: 0.8125rem;
     font-weight: 700;
-    white-space: nowrap;
 }
 
 .co-token-pill.active {
@@ -91,35 +94,35 @@
 .co-input-group {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    padding: 2px 16px;
+    padding: 0 16px;
     transition: border-color 0.2s;
 }
 
 .co-input-group:focus-within {
     border-color: var(--green);
+    background: rgba(0, 0, 0, 0.4);
 }
 
 .co-input-flat {
     flex: 1;
     background: transparent;
     border: none;
-    padding: 14px 0;
-    font-size: 1.125rem;
-    font-weight: 600;
+    padding: 16px 0;
+    font-size: 1.25rem;
+    font-weight: 700;
     color: #fff;
     outline: none;
     width: 0;
-    /* Important for flex-grow to work on small screens */
 }
 
 .co-input-label {
-    font-weight: 700;
+    font-weight: 800;
     color: var(--text-muted);
-    font-size: 0.875rem;
-    margin-left: 8px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
 }
 
 /* Presets */
@@ -130,13 +133,13 @@
 
 .btn-preset-sm {
     flex: 1;
-    padding: 6px;
+    padding: 8px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-muted);
+    font-weight: 700;
+    color: var(--text-secondary);
 }
 
 /* Payment Chips */
@@ -147,12 +150,12 @@
 }
 
 .co-method-chip {
-    padding: 8px 12px;
+    padding: 10px 16px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
 }
 
@@ -164,42 +167,28 @@
 
 /* Summaries */
 .co-summary-mini {
-    padding: 16px;
+    padding: 20px;
     border-radius: var(--radius-lg);
-    border: 1px solid rgba(132, 204, 22, 0.2);
 }
 
 .co-vault-box {
-    padding: 16px;
+    padding: 12px 20px;
     border-radius: var(--radius-lg);
     border: 1px solid transparent;
 }
 
 .co-vault-box.border-orange {
-    border-color: rgba(249, 115, 22, 0.2);
+    border-color: rgba(249, 115, 22, 0.4);
     background: rgba(249, 115, 22, 0.05);
 }
 
 .co-vault-box.border-green {
-    border-color: rgba(132, 204, 22, 0.2);
+    border-color: rgba(132, 204, 22, 0.4);
     background: rgba(132, 204, 22, 0.05);
 }
 
-/* Sticky Footer Action */
-.co-action-footer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 16px;
-    background: rgba(10, 10, 10, 0.8);
-    backdrop-filter: blur(12px);
-    border-top: 1px solid var(--border);
-    z-index: 100;
-}
-
+/* Steps & Actions */
 .btn-publish {
-    width: 100%;
     padding: 16px;
     border-radius: var(--radius-md);
     background: var(--green);
@@ -218,12 +207,23 @@
     opacity: 0.6;
 }
 
-.btn-publish.disabled {
-    background: var(--bg-card) !important;
-    color: var(--text-muted) !important;
+/* Animations */
+.animate-in {
+    animation: fadeIn 0.3s ease-out;
 }
 
-/* Animations & Spinner */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .animate-shake {
     animation: shake 0.5s ease-in-out;
 }
@@ -245,16 +245,16 @@
 }
 
 .co-error-banner {
-    padding: 12px 16px;
+    padding: 14px 20px;
     background: var(--red-bg);
     color: var(--red);
     border-radius: var(--radius-md);
     font-size: 0.8125rem;
-    margin-bottom: 16px;
+    font-weight: 600;
     border: 1px solid rgba(239, 68, 68, 0.2);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
 }
 
 .spinner-white {
