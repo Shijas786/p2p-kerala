@@ -26,6 +26,8 @@ export function Wallet({ user }: Props) {
     // Vault State
     const [vaultBaseUsdc, setVaultBaseUsdc] = useState('0.00');
     const [vaultBscUsdc, setVaultBscUsdc] = useState('0.00');
+    const [reservedBase, setReservedBase] = useState('0.00');
+    const [reservedBsc, setReservedBsc] = useState('0.00');
     const [showDeposit, setShowDeposit] = useState(false);
     const [showWithdraw, setShowWithdraw] = useState(false);
     const [vaultAmount, setVaultAmount] = useState('');
@@ -49,6 +51,8 @@ export function Wallet({ user }: Props) {
             setBalances(data);
             setVaultBaseUsdc(data.vault_base_usdc || '0.00');
             setVaultBscUsdc(data.vault_bsc_usdc || '0.00');
+            setReservedBase(data.vault_base_reserved || '0.00');
+            setReservedBsc(data.vault_bsc_reserved || '0.00');
         } catch { } finally {
             setLoading(false);
         }
@@ -219,6 +223,9 @@ export function Wallet({ user }: Props) {
         { symbol: 'USDT (BSC)', balance: balances?.bsc_usdt || '0.00', name: 'BSC', icon: 'USDT' },
     ];
 
+    const availableBase = Math.max(0, parseFloat(vaultBaseUsdc) - parseFloat(reservedBase)).toFixed(2);
+    const availableBsc = Math.max(0, parseFloat(vaultBscUsdc) - parseFloat(reservedBsc)).toFixed(2);
+
     return (
         <div className="page animate-in">
             <div className="page-header">
@@ -238,24 +245,43 @@ export function Wallet({ user }: Props) {
 
             {/* Vault Section */}
             <div className="w-vault card" style={{ background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', border: '1px solid var(--border-color)' }}>
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
                         <IconLock size={20} color="var(--primary)" />
                         <span className="font-bold">P2P Vault</span>
                     </div>
-                    <div className="text-xs text-muted">Upfront Locking</div>
+                    <div className="text-[10px] text-muted uppercase tracking-widest font-bold">SECURED ESCROW</div>
                 </div>
-                <div className="flex items-center justify-between mb-2">
-                    <div className="text-lg font-mono font-bold text-white">{vaultBaseUsdc} USDC <span className="text-xs text-muted">(Base)</span></div>
+
+                {/* Base Vault */}
+                <div className="vault-chain-box mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-muted font-bold">BASE NETWORK</span>
+                        <span className="text-white font-mono font-bold">{vaultBaseUsdc} USDC</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-orange opacity-80 italic">Reserved for Ads: {reservedBase}</span>
+                        <span className="text-green font-bold">Available: {availableBase}</span>
+                    </div>
                 </div>
-                <div className="flex items-center justify-between mb-4">
-                    <div className="text-lg font-mono font-bold text-white">{vaultBscUsdc} USDC <span className="text-xs text-muted">(BSC)</span></div>
+
+                {/* BSC Vault */}
+                <div className="vault-chain-box mb-5">
+                    <div className="flex justify-between items-center mb-1">
+                        <span className="text-[10px] text-muted font-bold">BSC NETWORK</span>
+                        <span className="text-white font-mono font-bold">{vaultBscUsdc} USDC</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px]">
+                        <span className="text-orange opacity-80 italic">Reserved for Ads: {reservedBsc}</span>
+                        <span className="text-green font-bold">Available: {availableBsc}</span>
+                    </div>
                 </div>
-                <div className="flex gap-2">
-                    <button className="btn btn-sm btn-primary flex-1" onClick={() => { setShowDeposit(true); setVaultAmount(''); setVaultError(''); setVaultSuccess(''); }}>
+
+                <div className="flex gap-3">
+                    <button className="btn btn-sm btn-primary flex-1 py-3" onClick={() => { setShowDeposit(true); setVaultAmount(''); setVaultError(''); setVaultSuccess(''); }}>
                         Deposit
                     </button>
-                    <button className="btn btn-sm btn-secondary flex-1" onClick={() => { setShowWithdraw(true); setVaultAmount(''); setVaultError(''); setVaultSuccess(''); }}>
+                    <button className="btn btn-sm btn-secondary flex-1 py-3" onClick={() => { setShowWithdraw(true); setVaultAmount(''); setVaultError(''); setVaultSuccess(''); }}>
                         Withdraw
                     </button>
                 </div>

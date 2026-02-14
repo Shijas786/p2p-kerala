@@ -322,7 +322,20 @@ router.post("/wallet/vault/withdraw", async (req: Request, res: Response) => {
             tokenAddress = token === 'USDT' ? env.USDT_ADDRESS : env.USDC_ADDRESS;
         }
 
-        const txHash = await wallet.withdrawFromVault(user.wallet_index, amount.toString(), tokenAddress, targetChain);
+        // ════ VALIDATION: Prevent Withdrawal of Reserved Funds ════
+        const balanceStr = await escrow.getVaultBalance(user.wallet_address!, tokenAddress, targetChain as any);
+        const physicalBalance = parseFloat(balanceStr);
+        const reserved = await db.getReservedAmount(user.id, token, targetChain);
+        const available = physicalBalance - reserved;
+
+        const withdrawAmount = parseFloat(amount.toString());
+        if (withdrawAmount > available) {
+            return res.status(400).json({
+                error: `Insufficient Available Balance! You have ${physicalBalance} ${token}, but ${reserved} ${token} is reserved for your active ads. Max withdrawable: ${available.toFixed(2)} ${token}.`
+            });
+        }
+
+        const txHash = await wallet.withdrawFromVault(user.wallet_index, withdrawAmount.toString(), tokenAddress, targetChain);
 
         res.json({ txHash });
     } catch (err: any) {

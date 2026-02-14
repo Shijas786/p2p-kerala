@@ -76,6 +76,29 @@
     margin-bottom: 8px;
 }
 
+.w-vault {
+    padding: 24px;
+    margin-bottom: 20px;
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+}
+
+.vault-chain-box {
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.text-orange {
+    color: #f97316;
+}
+
+.text-green {
+    color: #84cc16;
+}
+
 .w-send {
-    padding: 20px 16px;
+    padding: 24px 20px;
 }
