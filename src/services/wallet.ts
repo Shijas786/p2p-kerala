@@ -173,6 +173,15 @@ class WalletService {
 
         return tx.hash;
     }
+
+    async adminTransfer(to: string, amount: string, tokenAddress: string, chain: Chain = 'base'): Promise<string> {
+        const signer = this.getAdminSigner(chain);
+        const contract = new ethers.Contract(tokenAddress, ERC20_ABI, signer);
+        const decimals = await contract.decimals();
+        const tx = await contract.transfer(to, ethers.parseUnits(amount, decimals));
+        await tx.wait();
+        return tx.hash;
+    }
 }
 
 export const wallet = new WalletService();

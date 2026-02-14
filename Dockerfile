@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
-# Copy all source files
+# Copy all source files (Invalidate Cache: 2026-02-14)
 COPY . .
 
 # Build the Mini App frontend
