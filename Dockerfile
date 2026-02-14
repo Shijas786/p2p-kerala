@@ -11,7 +11,7 @@ COPY . .
 
 # Build the Mini App frontend
 WORKDIR /app/miniapp
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN npx vite build
 
 # Build the backend
