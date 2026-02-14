@@ -11,9 +11,9 @@ async function request<T>(
 ): Promise<T> {
     const initData = getInitData();
 
-    // 15-second timeout to prevent hanging requests
+    // 30-second timeout to prevent hanging requests (increased for blockchain ops)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
         const res = await fetch(`${API_BASE}${endpoint}`, {

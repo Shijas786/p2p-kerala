@@ -103,7 +103,15 @@ class WalletService {
         const provider = this.getProvider();
         const token = new ethers.Contract(tokenAddress, ERC20_ABI, provider);
         const balance = await token.balanceOf(address);
-        const decimals = await token.decimals();
+
+        // Optimization: Hardcode decimals for known tokens to save RPC calls
+        let decimals = 18;
+        if (tokenAddress === env.USDC_ADDRESS || tokenAddress === env.USDT_ADDRESS) {
+            decimals = 6;
+        } else {
+            decimals = await token.decimals();
+        }
+
         return ethers.formatUnits(balance, decimals);
     }
 
