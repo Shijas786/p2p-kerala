@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { WagmiProvider } from 'wagmi';
+import { useAccount } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { wagmiConfig, appKit } from './lib/wagmi';
 import { setupTelegramApp } from './lib/telegram';
 import { useAuth } from './hooks/useAuth';
+import { api } from './lib/api';
 import { Layout } from './components/Layout';
 import { WalletSelector } from './components/WalletSelector';
 import { Home } from './pages/Home';
@@ -24,11 +26,23 @@ const queryClient = new QueryClient({
 
 function AppInner() {
   const { user, loading, refreshUser } = useAuth();
+  const { address, isConnected } = useAccount();
   const [walletChosen, setWalletChosen] = useState(false);
+  const [walletMode, setWalletMode] = useState<'bot' | 'external' | null>(null);
 
   useEffect(() => {
     setupTelegramApp();
   }, []);
+
+  // When external wallet connects via WalletConnect, save it to backend
+  useEffect(() => {
+    if (walletMode === 'external' && isConnected && address) {
+      // Update the user's wallet address in the backend
+      api.wallet.connectExternal(address)
+        .then(() => refreshUser())
+        .catch((err) => console.error('Failed to save wallet:', err));
+    }
+  }, [isConnected, address, walletMode]);
 
   if (loading) {
     return (
@@ -45,11 +59,12 @@ function AppInner() {
     return (
       <WalletSelector
         onSelectBot={() => {
+          setWalletMode('bot');
           setWalletChosen(true);
-          // Bot wallet is auto-created on the backend
         }}
         onSelectExternal={async () => {
-          // Open Reown/WalletConnect modal for external wallet connection
+          setWalletMode('external');
+          // Open Reown/WalletConnect modal
           await appKit.open();
           setWalletChosen(true);
         }}
