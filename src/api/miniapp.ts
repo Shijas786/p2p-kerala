@@ -246,7 +246,7 @@ router.post("/orders", async (req: Request, res: Response) => {
 
 router.post("/orders/:id/cancel", async (req: Request, res: Response) => {
     try {
-        await db.cancelOrder(req.params.id);
+        await db.cancelOrder(req.params.id as string);
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -271,7 +271,7 @@ router.get("/trades", async (req: Request, res: Response) => {
 
 router.get("/trades/:id", async (req: Request, res: Response) => {
     try {
-        const trade = await db.getTradeById(req.params.id);
+        const trade = await db.getTradeById(req.params.id as string);
         if (!trade) return res.status(404).json({ error: "Trade not found" });
         res.json({ trade });
     } catch (err: any) {
@@ -319,7 +319,7 @@ router.post("/trades", async (req: Request, res: Response) => {
 
 router.post("/trades/:id/confirm-payment", async (req: Request, res: Response) => {
     try {
-        await db.updateTrade(req.params.id, {
+        await db.updateTrade(req.params.id as string, {
             status: "fiat_sent",
             fiat_sent_at: new Date().toISOString() as any,
         });
@@ -331,7 +331,7 @@ router.post("/trades/:id/confirm-payment", async (req: Request, res: Response) =
 
 router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) => {
     try {
-        await db.updateTrade(req.params.id, {
+        await db.updateTrade(req.params.id as string, {
             status: "fiat_confirmed",
             fiat_confirmed_at: new Date().toISOString() as any,
         });
@@ -344,7 +344,7 @@ router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) =
 router.post("/trades/:id/dispute", async (req: Request, res: Response) => {
     try {
         const { reason } = req.body;
-        await db.updateTrade(req.params.id, {
+        await db.updateTrade(req.params.id as string, {
             status: "disputed",
             dispute_reason: reason || "Dispute raised via Mini App",
         });
