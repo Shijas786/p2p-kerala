@@ -243,13 +243,46 @@ router.post("/orders", async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Missing required fields" });
         }
 
+        const parsedAmount = parseFloat(amount);
+        const parsedRate = parseFloat(rate);
+
+        if (parsedAmount <= 0) return res.status(400).json({ error: "Amount must be positive" });
+        if (parsedRate <= 0) return res.status(400).json({ error: "Rate must be positive" });
+
+        // ═══ SELL ORDER: Verify seller has enough balance ═══
+        if (type === "sell") {
+            if (!user.wallet_address) {
+                return res.status(400).json({ error: "No wallet configured. Set up your wallet first." });
+            }
+
+            try {
+                const tokenAddress = (token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+                const balance = await wallet.getTokenBalance(user.wallet_address, tokenAddress);
+                const balanceNum = parseFloat(balance);
+
+                if (balanceNum < parsedAmount) {
+                    return res.status(400).json({
+                        error: `Insufficient ${token} balance. You have ${balanceNum.toFixed(2)} but need ${parsedAmount.toFixed(2)}.`,
+                    });
+                }
+            } catch (balErr: any) {
+                console.error("[MINIAPP] Balance check error:", balErr);
+                return res.status(500).json({ error: "Failed to verify wallet balance. Try again." });
+            }
+        }
+
+        // ═══ BUY ORDER: Verify buyer has UPI set up ═══
+        if (type === "buy" && !user.upi_id) {
+            return res.status(400).json({ error: "Set up your UPI ID first to create buy orders." });
+        }
+
         const order = await db.createOrder({
             user_id: user.id,
             type,
             token: token || "USDC",
             chain: "base",
-            amount: parseFloat(amount),
-            rate: parseFloat(rate),
+            amount: parsedAmount,
+            rate: parsedRate,
             fiat_currency: "INR",
             payment_methods: payment_methods || ["UPI"],
         });
@@ -325,6 +358,34 @@ router.post("/trades", async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Invalid trade amount" });
         }
 
+        // ═══ DETERMINE SELLER & BUYER ═══
+        const sellerId = order.type === "sell" ? order.user_id : user.id;
+        const buyerId = order.type === "sell" ? user.id : order.user_id;
+        const seller = sellerId === user.id ? user : await db.getUserById(sellerId);
+        const buyer = buyerId === user.id ? user : await db.getUserById(buyerId);
+
+        if (!seller || !buyer) {
+            return res.status(400).json({ error: "Could not find trade parties" });
+        }
+
+        // ═══ BALANCE CHECK: Verify seller still has enough funds ═══
+        if (!seller.wallet_address) {
+            return res.status(400).json({ error: "Seller has no wallet configured" });
+        }
+
+        const tokenAddress = (order.token === "USDT") ? env.USDT_ADDRESS : env.USDC_ADDRESS;
+        try {
+            const sellerBalance = await wallet.getTokenBalance(seller.wallet_address, tokenAddress);
+            if (parseFloat(sellerBalance) < tradeAmount) {
+                return res.status(400).json({
+                    error: `Seller has insufficient ${order.token} balance (${parseFloat(sellerBalance).toFixed(2)} < ${tradeAmount.toFixed(2)})`,
+                });
+            }
+        } catch (balErr: any) {
+            console.error("[MINIAPP] Balance check error:", balErr);
+            return res.status(500).json({ error: "Failed to verify seller balance" });
+        }
+
         // Atomically fill the order to prevent double-matching
         const filled = await db.fillOrder(order_id, tradeAmount);
         if (!filled) {
@@ -336,10 +397,64 @@ router.post("/trades", async (req: Request, res: Response) => {
         const buyerReceives = tradeAmount - feeAmount;
 
         try {
+            // ═══ ESCROW: Lock seller's funds on-chain ═══
+            let escrowTxHash: string | null = null;
+            let onChainTradeId: number | null = null;
+
+            const sellerWalletType = (seller as any).wallet_type || 'bot';
+
+            if (sellerWalletType === 'bot' && env.ESCROW_CONTRACT_ADDRESS) {
+                // Bot wallet: server can sign — lock via relayer
+                try {
+                    // First: transfer seller's tokens to the relayer
+                    const sellerIndex = seller.wallet_index;
+                    await wallet.sendToken(
+                        sellerIndex,
+                        await wallet.getRelayerAddress(),
+                        tradeAmount,
+                        tokenAddress
+                    );
+
+                    // Then: relayer creates the escrow trade on-chain
+                    const escrowResult = await wallet.relayerCreateTrade(
+                        buyer.wallet_address || "0x0000000000000000000000000000000000000000",
+                        tradeAmount,
+                        tokenAddress,
+                        parseInt(env.ESCROW_TIMEOUT_SECONDS)
+                    );
+
+                    escrowTxHash = escrowResult.txHash;
+                    onChainTradeId = escrowResult.tradeId;
+                    console.log(`✅ Escrow locked: trade #${onChainTradeId}, tx: ${escrowTxHash}`);
+                } catch (escrowErr: any) {
+                    console.error("[MINIAPP] Escrow lock failed:", escrowErr);
+                    // Revert fill since escrow failed
+                    await db.revertFillOrder(order_id, tradeAmount);
+                    return res.status(500).json({ error: "Failed to lock funds in escrow: " + escrowErr.message });
+                }
+            } else if (sellerWalletType === 'bot' && !env.ESCROW_CONTRACT_ADDRESS) {
+                // Bot wallet without contract: transfer to relayer as simple escrow
+                try {
+                    const txHash = await wallet.sendToken(
+                        seller.wallet_index,
+                        await wallet.getRelayerAddress(),
+                        tradeAmount,
+                        tokenAddress
+                    );
+                    escrowTxHash = txHash;
+                    console.log(`✅ Funds held by relayer (no contract): tx: ${txHash}`);
+                } catch (transferErr: any) {
+                    console.error("[MINIAPP] Relayer transfer failed:", transferErr);
+                    await db.revertFillOrder(order_id, tradeAmount);
+                    return res.status(500).json({ error: "Failed to lock funds: " + transferErr.message });
+                }
+            }
+            // External wallets: escrow locking is skipped (must be done client-side)
+
             const trade = await db.createTrade({
                 order_id: order.id,
-                buyer_id: order.type === "sell" ? user.id : order.user_id,
-                seller_id: order.type === "sell" ? order.user_id : user.id,
+                buyer_id: buyerId,
+                seller_id: sellerId,
                 token: order.token,
                 chain: order.chain,
                 amount: tradeAmount,
@@ -349,6 +464,10 @@ router.post("/trades", async (req: Request, res: Response) => {
                 fee_amount: feeAmount,
                 buyer_receives: buyerReceives,
                 payment_method: ((order.payment_methods as string[]) || [])[0] as any || "UPI",
+                status: escrowTxHash ? "in_escrow" : "matched",
+                escrow_tx_hash: escrowTxHash as any,
+                on_chain_trade_id: onChainTradeId as any,
+                escrow_locked_at: escrowTxHash ? new Date().toISOString() as any : null,
             });
 
             res.json({ trade });
