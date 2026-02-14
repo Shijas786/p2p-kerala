@@ -566,6 +566,8 @@ router.post("/trades", async (req: Request, res: Response) => {
 
                 const balance = await escrow.getVaultBalance(seller.wallet_address!, tokenAddress, order.chain as any);
                 if (parseFloat(balance) < tradeAmount) {
+                    // ROLLBACK FILL
+                    await db.revertFillOrder(order_id, tradeAmount);
                     return res.status(400).json({
                         error: `Seller (you?) has insufficient Vault balance (${balance}). Please Deposit ${tradeAmount} ${order.token} to Vault first.`
                     });
@@ -588,6 +590,8 @@ router.post("/trades", async (req: Request, res: Response) => {
 
             } catch (err: any) {
                 console.error("[MINIAPP] Relayed trade creation failed:", err);
+                // ROLLBACK FILL
+                await db.revertFillOrder(order_id, tradeAmount);
                 return res.status(500).json({ error: "Failed to create trade on-chain: " + err.message });
             }
 

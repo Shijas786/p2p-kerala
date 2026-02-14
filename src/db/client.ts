@@ -212,21 +212,23 @@ class Database {
     async fillOrder(orderId: string, amount: number): Promise<boolean> {
         const db = this.getClient();
 
-        // 1. Get current order with lock-like check
-        const now = new Date().toISOString();
+        // 1. Get current order
         const { data: order } = await db
             .from("orders")
-            .select("*")
+            .select("amount, filled_amount, status")
             .eq("id", orderId)
-            .eq("status", "active")
-            .or(`expires_at.is.null,expires_at.gt.${now}`) // Ensure not expired
             .single();
 
-        if (!order) return false;
+        if (!order || order.status !== "active") return false;
 
-        const newFilled = order.filled_amount + amount;
-        const newStatus = newFilled >= order.amount ? "filled" : "active";
+        const oldFilled = parseFloat(order.filled_amount.toString());
+        const newFilled = oldFilled + amount;
 
+        if (newFilled > parseFloat(order.amount.toString())) return false;
+
+        const newStatus = newFilled >= parseFloat(order.amount.toString()) ? "filled" : "active";
+
+        // 2. Atomic update: only update if filled_amount hasn't changed since our read
         const { data, error } = await db
             .from("orders")
             .update({
@@ -235,35 +237,52 @@ class Database {
                 updated_at: new Date().toISOString()
             })
             .eq("id", orderId)
-            .eq("status", "active") // Double check status hasn't changed
+            .eq("filled_amount", oldFilled) // OCC check
+            .eq("status", "active")
             .select();
 
         return !error && data && data.length > 0;
-
-        return !error;
     }
     /**
      * Revert a fill if the trade creation fails
      */
     async revertFillOrder(orderId: string, amount: number): Promise<void> {
         const db = this.getClient();
-        const { data: order } = await db
-            .from("orders")
-            .select("filled_amount, amount")
-            .eq("id", orderId)
-            .single();
 
-        if (!order) return;
+        // Use recursive-like retry or just atomic revert if possible
+        // But since we are reverting, we don't strictly need OCC as long as we subtract
+        // However, Supabase doesn't support relative updates (field = field - x) directly via client
+        // So we use OCC again to be safe
 
-        const newFilled = Math.max(0, order.filled_amount - amount);
-        await db
-            .from("orders")
-            .update({
-                filled_amount: newFilled,
-                status: "active",
-                updated_at: new Date().toISOString()
-            })
-            .eq("id", orderId);
+        let success = false;
+        let attempts = 0;
+
+        while (!success && attempts < 3) {
+            attempts++;
+            const { data: order } = await db
+                .from("orders")
+                .select("filled_amount, amount")
+                .eq("id", orderId)
+                .single();
+
+            if (!order) return;
+
+            const oldFilled = parseFloat(order.filled_amount.toString());
+            const newFilled = Math.max(0, oldFilled - amount);
+
+            const { data } = await db
+                .from("orders")
+                .update({
+                    filled_amount: newFilled,
+                    status: "active", // Always set back to active if we are reverting a fill
+                    updated_at: new Date().toISOString()
+                })
+                .eq("id", orderId)
+                .eq("filled_amount", oldFilled)
+                .select();
+
+            if (data && data.length > 0) success = true;
+        }
     }
 
     async cancelOrder(orderId: string): Promise<void> {
