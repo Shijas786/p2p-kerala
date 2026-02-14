@@ -33,7 +33,7 @@ export function Home({ user }: Props) {
             }
         }
         load();
-    }, []);
+    }, [user?.wallet_address]);
 
     const activeTrades = trades.filter(t => !['completed', 'cancelled', 'expired', 'refunded'].includes(t.status));
 

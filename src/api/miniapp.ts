@@ -107,12 +107,28 @@ router.post("/auth", async (req: Request, res: Response) => {
         const tgUser = req.telegramUser;
         if (!tgUser) return res.status(401).json({ error: "No user" });
 
-        // getOrCreateUser handles both lookup and creation with HD wallet
+        // getOrCreateUser handles both lookup and creation
         const user = await db.getOrCreateUser(
             tgUser.id,
             tgUser.username,
             tgUser.first_name
         );
+
+        // If user has no wallet yet (new user with bot wallet), derive one
+        if (!user.wallet_address && ((user as any).wallet_type === 'bot' || !(user as any).wallet_type)) {
+            try {
+                const derived = wallet.deriveWallet(user.wallet_index);
+                await db.updateUser(user.id, {
+                    wallet_address: derived.address,
+                    wallet_type: 'bot',
+                } as any);
+                user.wallet_address = derived.address;
+                (user as any).wallet_type = 'bot';
+                console.log(`[AUTH] Derived bot wallet for user ${user.id}: ${derived.address}`);
+            } catch (walletErr: any) {
+                console.error("[AUTH] Failed to derive wallet:", walletErr);
+            }
+        }
 
         res.json({ user });
     } catch (err: any) {
@@ -129,11 +145,11 @@ router.get("/wallet/balances", async (req: Request, res: Response) => {
     try {
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
         if (!user?.wallet_address) {
-            return res.json({ eth: "0", usdc: "0.00", usdt: "0.00", address: null });
+            return res.json({ eth: "0", usdc: "0.00", usdt: "0.00", address: null, wallet_type: (user as any)?.wallet_type || 'bot' });
         }
 
         const balances = await wallet.getBalances(user.wallet_address);
-        res.json(balances);
+        res.json({ ...balances, wallet_type: (user as any).wallet_type || 'bot' });
     } catch (err: any) {
         console.error("[MINIAPP] Wallet balances error:", err);
         res.status(500).json({ error: err.message });
