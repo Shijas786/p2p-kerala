@@ -270,7 +270,15 @@ bot.command("start", async (ctx) => {
         upiStatus,
     ].join("\n");
 
-    await ctx.reply(welcome, { parse_mode: "Markdown" });
+    const miniAppUrl = "https://distant-angelita-highphaus-3207b925.koyeb.app/app";
+
+    const startKeyboard = new InlineKeyboard()
+        .webApp("📱 Open Mini App", miniAppUrl)
+        .row()
+        .text("🔴 Sell Crypto", "newad:sell")
+        .text("🟢 Buy Crypto", "newad:buy");
+
+    await ctx.reply(welcome, { parse_mode: "Markdown", reply_markup: startKeyboard });
 
     // If new user, immediately ask for UPI
     if (isNewUser && !user.upi_id) {
