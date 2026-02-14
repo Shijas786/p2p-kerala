@@ -1,5 +1,5 @@
-import { useEffect, useCallback } from 'react';
-import { getTelegramWebApp, type TelegramWebApp } from '../lib/telegram';
+import { useCallback } from 'react';
+import { getTelegramWebApp } from '../lib/telegram';
 
 export function useTelegram() {
     const webapp = getTelegramWebApp();

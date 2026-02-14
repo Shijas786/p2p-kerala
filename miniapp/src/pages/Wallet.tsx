@@ -1,13 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { haptic } from '../lib/telegram';
-import { IconTokenETH, IconTokenUSDC, IconTokenUSDT, IconSend, IconReceive, IconRefresh, IconCopy, IconCheck, IconLock } from '../components/Icons';
+import { IconTokenETH, IconTokenUSDC, IconTokenUSDT, IconSend, IconReceive, IconRefresh, IconCheck, IconLock } from '../components/Icons';
 import './Wallet.css';
-import { useAccount, useWriteContract } from 'wagmi';
-import { parseUnits } from 'viem';
-import EscrowABI from '../abis/EscrowABI.json';
-import ERC20ABI from '../abis/ERC20ABI.json';
-import { ESCROW_ADDRESS, USDC_ADDRESS } from '../constants';
 
 interface Props {
     user: any;
@@ -22,7 +17,6 @@ export function Wallet({ user }: Props) {
     const [sendToken, setSendToken] = useState('USDC');
     const [sending, setSending] = useState(false);
     const [sendResult, setSendResult] = useState('');
-    const [copied, setCopied] = useState(false);
 
     // Vault State
     const [vaultBaseUsdc, setVaultBaseUsdc] = useState('0.00');
@@ -34,10 +28,6 @@ export function Wallet({ user }: Props) {
     const [vaultLoading, setVaultLoading] = useState(false);
     const [vaultError, setVaultError] = useState('');
     const [vaultSuccess, setVaultSuccess] = useState('');
-
-    // Wagmi
-    const { address: externalAddress } = useAccount();
-    const { writeContractAsync } = useWriteContract();
 
     useEffect(() => {
         loadBalances();
@@ -58,9 +48,7 @@ export function Wallet({ user }: Props) {
     function copyAddress() {
         if (!balances?.address) return;
         navigator.clipboard.writeText(balances.address);
-        setCopied(true);
         haptic('success');
-        setTimeout(() => setCopied(false), 2000);
     }
 
     async function handleSend() {
@@ -96,9 +84,8 @@ export function Wallet({ user }: Props) {
 
         try {
             const amount = parseFloat(vaultAmount);
-            // TODO: External wallet deposit for BSC? usage of wagmi might need chain switching
             if (user?.wallet_type === 'external') {
-                setVaultError("External wallet deposit only supported for Base for now. Please use bot wallet or wait for update.");
+                setVaultError("Please use the 'Create Ad' page to deposit for external wallets.");
                 return;
             }
 
@@ -131,7 +118,7 @@ export function Wallet({ user }: Props) {
             const amount = parseFloat(vaultAmount);
 
             if (user?.wallet_type === 'external') {
-                setVaultError("Custom wallet withdraw not fully supported yet.");
+                setVaultError("External wallet withdrawal coming soon.");
                 return;
             }
 

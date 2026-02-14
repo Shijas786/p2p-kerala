@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAccount, useReadContract, useWriteContract, useSwitchChain } from 'wagmi';
+import { waitForTransactionReceipt } from '@wagmi/core';
 import { parseUnits, formatUnits } from 'viem';
 import { api } from '../lib/api';
 import { haptic } from '../lib/telegram';
 import { CONTRACTS, ESCROW_ABI, ERC20_ABI } from '../lib/contracts';
+import { wagmiConfig } from '../lib/wagmi';
+import { useAuth } from '../hooks/useAuth';
 import './CreateOrder.css';
 
 const PAYMENT_METHODS = ['UPI', 'IMPS', 'NEFT', 'PAYTM', 'BANK'];
 
 export function CreateOrder() {
     const navigate = useNavigate();
+    const { user } = useAuth();
     const { address, isConnected, chain: walletChain } = useAccount();
     const { switchChain } = useSwitchChain();
     const [step, setStep] = useState(1);
@@ -23,6 +27,13 @@ export function CreateOrder() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [txStep, setTxStep] = useState<'idle' | 'approving' | 'depositing' | 'creating'>('idle');
+
+    // Decimal logic synchronized with backend EscrowService
+    const getDecimals = () => {
+        if (chain === 'base' && (token === 'USDC' || token === 'USDT')) return 6;
+        return 18;
+    };
+    const decimals = getDecimals();
 
     // Wagmi: Contract Interactions
     const targetChainId = chain === 'bsc' ? 56 : 8453;
@@ -61,10 +72,10 @@ export function CreateOrder() {
     };
 
     const needsDeposit = type === 'sell' && isConnected && vaultBalance !== undefined && amount &&
-        parseFloat(formatUnits(vaultBalance as bigint, token === 'USDC' || token === 'USDT' ? 6 : 18)) < parseFloat(amount);
+        parseFloat(formatUnits(vaultBalance as bigint, decimals)) < parseFloat(amount);
 
     const needsApproval = needsDeposit && allowance !== undefined && amount &&
-        parseFloat(formatUnits(allowance as bigint, token === 'USDC' || token === 'USDT' ? 6 : 18)) < parseFloat(amount);
+        parseFloat(formatUnits(allowance as bigint, decimals)) < parseFloat(amount);
 
     function toggleMethod(m: string) {
         haptic('selection');
@@ -110,7 +121,13 @@ export function CreateOrder() {
                     return;
                 }
 
-                const decimals = (token === 'USDC' || token === 'USDT') ? 6 : 18;
+                // Security check: Match backend account address with connected wallet
+                if (user?.wallet_address && user.wallet_address.toLowerCase() !== address?.toLowerCase()) {
+                    setError(`Wallet mismatch! Account uses: ${user.wallet_address.slice(0, 6)}...${user.wallet_address.slice(-4)}. Switch wallet to use these funds.`);
+                    setSubmitting(false);
+                    return;
+                }
+
                 const amountUnits = parseUnits(amount, decimals);
 
                 // 1. Approve if needed
@@ -122,9 +139,9 @@ export function CreateOrder() {
                         functionName: 'approve',
                         args: [escrowAddress, amountUnits],
                     });
-                    console.log('Approval Tx:', hash);
-                    // We wait for tx in real apps, but for briefity let's just proceed or assume refetch
-                    // Ideally: await publicClient.waitForTransactionReceipt({ hash })
+                    console.log('Approval Sent:', hash);
+                    await waitForTransactionReceipt(wagmiConfig, { hash, chainId: targetChainId });
+                    console.log('Approval Confirmed');
                 }
 
                 // 2. Deposit if needed
@@ -136,7 +153,9 @@ export function CreateOrder() {
                         functionName: 'deposit',
                         args: [tokenAddress, amountUnits],
                     });
-                    console.log('Deposit Tx:', hash);
+                    console.log('Deposit Sent:', hash);
+                    await waitForTransactionReceipt(wagmiConfig, { hash, chainId: targetChainId });
+                    console.log('Deposit Confirmed');
                 }
             }
 
@@ -155,7 +174,8 @@ export function CreateOrder() {
             navigate('/market');
         } catch (err: any) {
             console.error(err);
-            setError(err.message || 'Failed to create order');
+            // Wagmi errors often have a shortMessage
+            setError(err.shortMessage || err.message || 'Failed to create order');
             haptic('error');
         } finally {
             setSubmitting(false);
@@ -335,7 +355,7 @@ export function CreateOrder() {
                             <div className="flex justify-between items-center mb-1">
                                 <span className="text-xs text-muted uppercase">Vault Balance</span>
                                 <span className={`text-sm font-mono ${needsDeposit ? 'text-orange' : 'text-green'}`}>
-                                    {vaultBalance ? formatUnits(vaultBalance as bigint, (token === 'USDC' || token === 'USDT') ? 6 : 18) : '0.00'} {token}
+                                    {vaultBalance ? formatUnits(vaultBalance as bigint, decimals) : '0.00'} {token}
                                 </span>
                             </div>
                             {needsDeposit && (

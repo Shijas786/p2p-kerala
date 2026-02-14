@@ -57,8 +57,19 @@ export const api = {
 
     // ---- Wallet ----
     wallet: {
-        getBalances: () => request<{ eth: string; usdc: string; usdt: string; address: string; vault_usdc?: string; wallet_type?: string }>('/wallet/balances'),
-        send: (data: { to: string; amount: number; token: string }) =>
+        getBalances: () => request<{
+            eth: string;
+            usdc: string;
+            usdt: string;
+            bnb: string;
+            bsc_usdc: string;
+            bsc_usdt: string;
+            address: string;
+            vault_base_usdc?: string;
+            vault_bsc_usdc?: string;
+            wallet_type?: string;
+        }>('/wallet/balances'),
+        send: (data: { to: string; amount: number; token: string; chain?: string }) =>
             request<{ txHash: string }>('/wallet/send', {
                 method: 'POST',
                 body: JSON.stringify(data),
@@ -69,15 +80,15 @@ export const api = {
                 body: JSON.stringify({ address }),
             }),
         connectBot: () => request<{ success: boolean; address: string }>('/wallet/bot', { method: 'POST' }),
-        depositToVault: (amount: number, token: string) =>
+        depositToVault: (amount: number, token: string, chain: string) =>
             request<{ txHash: string }>('/wallet/vault/deposit', {
                 method: 'POST',
-                body: JSON.stringify({ amount, token }),
+                body: JSON.stringify({ amount, token, chain }),
             }),
-        withdrawFromVault: (amount: number, token: string) =>
+        withdrawFromVault: (amount: number, token: string, chain: string) =>
             request<{ txHash: string }>('/wallet/vault/withdraw', {
                 method: 'POST',
-                body: JSON.stringify({ amount, token }),
+                body: JSON.stringify({ amount, token, chain }),
             }),
     },
 
