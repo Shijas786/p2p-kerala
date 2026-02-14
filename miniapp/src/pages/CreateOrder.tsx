@@ -414,8 +414,16 @@ export function CreateOrder() {
                 ) : (
                     <button
                         className={`btn flex-1 ${needsDeposit ? (isExternalUser ? 'btn-warn' : 'btn-secondary') : 'btn-primary'}`}
-                        onClick={isExternalUser || !needsDeposit ? submit : () => navigate('/wallet')}
-                        disabled={submitting || isDataLoading}
+                        onClick={() => {
+                            if (isExternalUser && !isConnected) {
+                                appKit.open();
+                            } else if (!isExternalUser || !needsDeposit) {
+                                submit();
+                            } else {
+                                navigate('/wallet');
+                            }
+                        }}
+                        disabled={submitting || (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance)))}
                     >
                         {submitting ? (
                             <div className="flex items-center gap-2 justify-center">
@@ -426,11 +434,13 @@ export function CreateOrder() {
                                             txStep === 'creating' ? 'Publishing...' : 'Working...'}
                                 </span>
                             </div>
-                        ) : isDataLoading ? (
+                        ) : (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance))) ? (
                             <div className="flex items-center gap-2 justify-center">
                                 <span className="spinner" />
                                 <span className="text-xs uppercase font-bold">Checking Vault...</span>
                             </div>
+                        ) : (isExternalUser && !isConnected) ? (
+                            '🔌 Connect Wallet'
                         ) : (
                             needsDeposit ? (isExternalUser ? `Deposit & Publish` : 'Go to Wallet to Deposit') : '✅ Publish Ad'
                         )}
