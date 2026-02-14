@@ -74,6 +74,51 @@ async function broadcast(message: string, keyboard?: InlineKeyboard) {
     }));
 }
 
+export async function broadcastTradeSuccess(trade: any, order: any) {
+    try {
+        const groupVal = (order.payment_details as any)?.group_id;
+        const targetGroup = typeof groupVal === 'number' ? groupVal : undefined;
+
+        if (targetGroup) {
+            await bot.api.sendMessage(
+                String(targetGroup),
+                `🔥 *JUST SOLD!* 🚀\n\nSomeone just bought *${formatUSDC(trade.amount)}* from @${trade.seller_username || "Seller"}!\n\n⚡ P2P Kerala is active. /start to trade.`,
+                { parse_mode: "Markdown" }
+            ).catch(e => console.error(`Group FOMO Broadcast failed:`, e));
+        }
+    } catch (e) {
+        console.error("BroadcastSuccess error:", e);
+    }
+}
+
+export async function broadcastAd(order: any, user: any) {
+    try {
+        const botUser = await bot.api.getMe();
+        // Explicitly cast to prevent lint errors
+        const groupVal = (order.payment_details as any)?.group_id;
+        const targetGroup = typeof groupVal === 'number' ? groupVal : undefined;
+
+        if (targetGroup !== undefined) {
+            // Post ONLY to that group
+            await bot.api.sendMessage(
+                String(targetGroup),
+                `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👉 [Buy Now](https://t.me/${botUser.username}?start=buy_${order.id})`,
+                { parse_mode: "Markdown" }
+            ).catch(e => console.error(`Group Broadcast failed to ${targetGroup}:`, e));
+
+        } else if (env.BROADCAST_CHANNEL_ID) {
+            // Fallback: Post to Main Channel for Direct DM ads
+            await bot.api.sendMessage(
+                env.BROADCAST_CHANNEL_ID,
+                `📢 *New Sell Ad!* 🚀\n\n💰 Sell: *${formatUSDC(order.amount)}*\n📈 Rate: *${formatINR(order.rate)}/USDC*\n👤 Seller: @${user.username || "Anonymous"}\n\n👉 [Buy Now](https://t.me/${botUser.username}?start=buy_${order.id})`,
+                { parse_mode: "Markdown" }
+            ).catch(e => console.error("Main Channel Broadcast failed:", e));
+        }
+    } catch (e) {
+        console.error("BroadcastAd error:", e);
+    }
+}
+
 async function ensureUser(ctx: BotContext): Promise<User> {
     const from = ctx.from!;
     console.log(`DEBUG: ensureUser for ${from.id}...`);

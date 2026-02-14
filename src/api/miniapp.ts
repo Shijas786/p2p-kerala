@@ -8,7 +8,7 @@ import { env } from "../config/env";
 import { db } from "../db/client";
 import { wallet } from "../services/wallet";
 import { escrow } from "../services/escrow";
-import { bot } from "../bot";
+import { bot, broadcastTradeSuccess } from "../bot";
 
 const router = Router();
 
@@ -789,6 +789,18 @@ router.post("/trades/:id/confirm-receipt", async (req: Request, res: Response) =
         await notifyTradeUpdate(trade.buyer_id,
             `🎉 <b>Trade Completed!</b>\n\nSeller <b>${user.first_name || 'User'}</b> has released <b>${trade.amount} ${trade.token}</b> to your Vault.\n\nThank you for trading with P2P Kerala! 🚀`
         );
+
+        // NOTIFY GROUP (FOMO)
+        try {
+            const originalOrder = await db.getOrderById(trade.order_id);
+            if (originalOrder) {
+                // Add seller username to trade object for the broadcast msg
+                const tradeWithUsername = { ...trade, seller_username: user.username };
+                await broadcastTradeSuccess(tradeWithUsername, originalOrder);
+            }
+        } catch (e) {
+            console.error("FOMO Broadcast error:", e);
+        }
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
