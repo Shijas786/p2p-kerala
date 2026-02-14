@@ -75,30 +75,54 @@ function AppInner() {
   const [walletChosen, setWalletChosen] = useState(false);
   const [walletMode, setWalletMode] = useState<'bot' | 'external' | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [savingAddress, setSavingAddress] = useState(false);
 
   useEffect(() => {
     setupTelegramApp();
   }, []);
 
-  // When external wallet connects via WalletConnect, save it to backend
-  // This fires AFTER appKit modal connects — walletChosen is still false
+  // Auto-detect returning users who already have a wallet configured
   useEffect(() => {
-    if (walletMode === 'external' && isConnected && address && !walletChosen) {
+    if (user && !walletChosen && !connecting && !loading) {
+      if (user.wallet_address && user.wallet_type === 'external') {
+        console.log('[P2P] Returning external wallet user:', user.wallet_address);
+        setWalletMode('external');
+        setWalletChosen(true);
+      } else if (user.wallet_address && user.wallet_type === 'bot') {
+        console.log('[P2P] Returning bot wallet user:', user.wallet_address);
+        setWalletMode('bot');
+        setWalletChosen(true);
+      }
+      // If wallet_address is null, show selector
+    }
+  }, [user, walletChosen, connecting, loading]);
+
+  // When wagmi detects a connected external wallet, save it to backend
+  useEffect(() => {
+    if (walletMode === 'external' && isConnected && address && !savingAddress && !walletChosen) {
+      console.log('[P2P] External wallet connected via WalletConnect:', address);
+      setSavingAddress(true);
       setConnecting(true);
+
       api.wallet.connectExternal(address)
-        .then(() => refreshUser())
         .then(() => {
+          console.log('[P2P] External address saved to backend');
+          return refreshUser();
+        })
+        .then(() => {
+          console.log('[P2P] User refreshed with new wallet');
           setWalletChosen(true);
           setConnecting(false);
+          setSavingAddress(false);
         })
         .catch((err) => {
-          console.error('Failed to save wallet:', err);
+          console.error('[P2P] Failed to save external wallet:', err);
           setConnecting(false);
-          // Still show app even if save fails
-          setWalletChosen(true);
+          setSavingAddress(false);
+          setWalletChosen(true); // show app anyway
         });
     }
-  }, [isConnected, address, walletMode, walletChosen]);
+  }, [isConnected, address, walletMode, walletChosen, savingAddress]);
 
   if (loading) {
     return (
@@ -121,7 +145,7 @@ function AppInner() {
     );
   }
 
-  // Always show wallet selector first
+  // Show wallet selector for NEW users only (no wallet in DB)
   if (!walletChosen) {
     return (
       <WalletSelector
@@ -131,9 +155,16 @@ function AppInner() {
         }}
         onSelectExternal={async () => {
           setWalletMode('external');
-          // Open Reown/WalletConnect modal — don't set walletChosen yet!
+          console.log('[P2P] Opening WalletConnect modal...');
+          // Open Reown/WalletConnect modal
           // walletChosen will be set by the useEffect above after address is saved
           await appKit.open();
+
+          // Fallback: if wagmi already connected (persisted session), trigger save
+          // Small delay to let wagmi state update
+          setTimeout(() => {
+            console.log('[P2P] After modal open, wagmi state:', { isConnected, address });
+          }, 1000);
         }}
       />
     );
