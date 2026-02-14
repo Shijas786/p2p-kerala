@@ -7,15 +7,20 @@ import './Profile.css';
 interface Props {
     user: any;
     onUpdate: () => void;
+    onSwitchWallet: () => void;
 }
 
-export function Profile({ user, onUpdate }: Props) {
+export function Profile({ user, onUpdate, onSwitchWallet }: Props) {
     const [upiInput, setUpiInput] = useState(user?.upi_id || '');
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
 
     async function saveUpi() {
+        // ... existing saveUpi logic ...
+        // (I will truncate this part in the tool call to keep it clean, or I can just target the interface and the specific render section)
+        // Actually, better to do it in chunks or use multi_replace if I need to touch multiple places.
+        // Let's use multi_replace for cleaner edits.
         if (!upiInput || !upiInput.includes('@')) {
             setMessage('error:Enter a valid UPI ID (e.g. name@upi)');
             return;
@@ -134,9 +139,23 @@ export function Profile({ user, onUpdate }: Props) {
 
             {/* Wallet Type */}
             <div className="p-section card">
-                <h3 className="mb-2" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <IconLock size={18} /> Wallet Type
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <IconLock size={18} /> Wallet Type
+                    </h3>
+                    <button
+                        className="btn btn-sm btn-outline"
+                        style={{ color: '#ff4d4d', borderColor: '#ff4d4d33' }}
+                        onClick={() => {
+                            if (window.confirm('Switch wallet? This will return you to the wallet selection screen.')) {
+                                haptic('medium');
+                                onSwitchWallet();
+                            }
+                        }}
+                    >
+                        Switch
+                    </button>
+                </div>
                 <div className="flex items-center gap-3">
                     <span className="text-sm">
                         {user?.wallet_address
@@ -144,7 +163,9 @@ export function Profile({ user, onUpdate }: Props) {
                             : 'No wallet connected'
                         }
                     </span>
-                    <span className="badge badge-green text-xs">Bot Wallet</span>
+                    <span className={`badge ${user?.wallet_type === 'external' ? 'badge-blue' : 'badge-green'} text-xs`}>
+                        {user?.wallet_type === 'external' ? 'External Wallet' : 'Bot Wallet'}
+                    </span>
                 </div>
             </div>
 

@@ -267,6 +267,13 @@ router.post("/orders", async (req: Request, res: Response) => {
 
         // ═══ SELL ORDER: Verify seller has enough balance ═══
         if (type === "sell") {
+            // Block external wallets from selling (server cannot lock their funds)
+            if ((user as any).wallet_type === 'external') {
+                return res.status(400).json({
+                    error: "External wallets cannot create sell ads yet. Please use the Bot Wallet to sell, or just Buy from others."
+                });
+            }
+
             if (!user.wallet_address) {
                 return res.status(400).json({ error: "No wallet configured. Set up your wallet first." });
             }

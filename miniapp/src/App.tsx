@@ -167,6 +167,16 @@ function AppInner() {
     );
   }
 
+  const handleSwitchWallet = async () => {
+    // Disconnect wagmi if connected
+    if (isConnected) {
+      await appKit.disconnect();
+    }
+    setWalletMode(null);
+    setWalletChosen(false);
+    // Optionally clear from DB or just let them switch (we might want to keep the DB record until they pick a new one, but for UI switching, local state reset is enough)
+  };
+
   return (
     <BrowserRouter basename="/app">
       <Routes>
@@ -178,7 +188,7 @@ function AppInner() {
           <Route path="trade/new/:orderId" element={<TradeDetail />} />
           <Route path="wallet" element={<Wallet user={user} />} />
           <Route path="bridge" element={<Bridge />} />
-          <Route path="profile" element={<Profile user={user} onUpdate={refreshUser} />} />
+          <Route path="profile" element={<Profile user={user} onUpdate={refreshUser} onSwitchWallet={handleSwitchWallet} />} />
         </Route>
       </Routes>
     </BrowserRouter>
