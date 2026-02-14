@@ -156,12 +156,23 @@ export function Wallet({ user }: Props) {
 
     async function handleWithdraw() {
         if (!vaultAmount || parseFloat(vaultAmount) <= 0) return;
+
+        const amount = parseFloat(vaultAmount);
+        const available = vaultChain === 'bsc' ? parseFloat(availableBsc) : parseFloat(availableBase);
+
+        if (amount > available) {
+            const reserved = vaultChain === 'bsc' ? reservedBsc : reservedBase;
+            const total = vaultChain === 'bsc' ? vaultBscUsdc : vaultBaseUsdc;
+            setVaultError(`Insufficient Available Balance! You have ${total} USDC, but ${reserved} USDC is reserved for your active ads. Max withdrawable: ${available} USDC.`);
+            haptic('error');
+            return;
+        }
+
         setVaultLoading(true);
         setVaultError('');
         setVaultSuccess('');
 
         try {
-            const amount = parseFloat(vaultAmount);
             const isExternal = user?.wallet_type === 'external';
             const chainId = vaultChain === 'bsc' ? bsc.id : base.id;
             const decimals = vaultChain === 'bsc' ? 18 : 6;
@@ -200,7 +211,7 @@ export function Wallet({ user }: Props) {
             }, 2000);
         } catch (err: any) {
             console.error(err);
-            setVaultError(err.message || 'Withdrawal failed');
+            setVaultError(err.response?.data?.error || err.message || 'Withdrawal failed');
             haptic('error');
         } finally {
             setVaultLoading(false);
