@@ -32,7 +32,7 @@ export function MyAds() {
     }
 
     async function handleCancel(id: string) {
-        if (!window.confirm('Are you sure you want to cancel this ad?')) return;
+        if (!window.confirm('Are you sure you want to cancel this ad? Funds will remain in your P2P Vault (Escrow Balance) for your next ad. You can withdraw them back to your wallet anytime from the Wallet page.')) return;
 
         haptic('medium');
         setCancellingId(id);

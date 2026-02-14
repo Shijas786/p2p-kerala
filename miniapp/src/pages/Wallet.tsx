@@ -2,6 +2,11 @@ import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 import { haptic } from '../lib/telegram';
 import { IconTokenETH, IconTokenUSDC, IconTokenUSDT, IconSend, IconReceive, IconRefresh, IconCheck, IconLock } from '../components/Icons';
+import { useAccount, useWriteContract, useConfig } from 'wagmi';
+import { parseUnits } from 'viem';
+import { waitForTransactionReceipt } from 'wagmi/actions';
+import { ESCROW_ABI, ERC20_ABI, CONTRACTS } from '../lib/contracts';
+import { bsc, base } from 'wagmi/chains';
 import './Wallet.css';
 
 interface Props {
@@ -28,6 +33,10 @@ export function Wallet({ user }: Props) {
     const [vaultLoading, setVaultLoading] = useState(false);
     const [vaultError, setVaultError] = useState('');
     const [vaultSuccess, setVaultSuccess] = useState('');
+
+    const { address: wagmiAddress, isConnected } = useAccount();
+    const { writeContractAsync } = useWriteContract();
+    const config = useConfig();
 
     useEffect(() => {
         loadBalances();
@@ -84,14 +93,47 @@ export function Wallet({ user }: Props) {
 
         try {
             const amount = parseFloat(vaultAmount);
-            if (user?.wallet_type === 'external') {
-                setVaultError("Please use the 'Create Ad' page to deposit for external wallets.");
-                return;
-            }
+            const isExternal = user?.wallet_type === 'external';
+            const chainId = vaultChain === 'bsc' ? bsc.id : base.id;
+            const decimals = vaultChain === 'bsc' ? 18 : 6;
+            const tokenAddress = (CONTRACTS as any)[vaultChain]?.tokens.USDC;
+            const escrowAddress = (CONTRACTS as any)[vaultChain]?.escrow;
 
-            // Bot Wallet
-            await api.wallet.depositToVault(amount, 'USDC', vaultChain);
-            setVaultSuccess('Deposit successful!');
+            if (isExternal) {
+                if (!isConnected || !wagmiAddress) {
+                    setVaultError("Please connect your wallet first.");
+                    return;
+                }
+
+                const parsedAmount = parseUnits(vaultAmount, decimals);
+
+                // 1. Approve
+                setVaultSuccess('Step 1/2: Approving USDC...');
+                const approveHash = await writeContractAsync({
+                    address: tokenAddress as `0x${string}`,
+                    abi: ERC20_ABI,
+                    functionName: 'approve',
+                    args: [escrowAddress as `0x${string}`, parsedAmount],
+                    chainId
+                });
+                await waitForTransactionReceipt(config, { hash: approveHash });
+
+                // 2. Deposit
+                setVaultSuccess('Step 2/2: Depositing to Vault...');
+                const depositHash = await writeContractAsync({
+                    address: escrowAddress as `0x${string}`,
+                    abi: ESCROW_ABI,
+                    functionName: 'deposit',
+                    args: [tokenAddress as `0x${string}`, parsedAmount],
+                    chainId
+                });
+                await waitForTransactionReceipt(config, { hash: depositHash });
+                setVaultSuccess('Deposit successful!');
+            } else {
+                // Bot Wallet
+                await api.wallet.depositToVault(amount, 'USDC', vaultChain);
+                setVaultSuccess('Deposit successful!');
+            }
 
             haptic('success');
             setVaultAmount('');
@@ -116,15 +158,35 @@ export function Wallet({ user }: Props) {
 
         try {
             const amount = parseFloat(vaultAmount);
+            const isExternal = user?.wallet_type === 'external';
+            const chainId = vaultChain === 'bsc' ? bsc.id : base.id;
+            const decimals = vaultChain === 'bsc' ? 18 : 6;
+            const tokenAddress = (CONTRACTS as any)[vaultChain]?.tokens.USDC;
+            const escrowAddress = (CONTRACTS as any)[vaultChain]?.escrow;
 
-            if (user?.wallet_type === 'external') {
-                setVaultError("External wallet withdrawal coming soon.");
-                return;
+            if (isExternal) {
+                if (!isConnected || !wagmiAddress) {
+                    setVaultError("Please connect your wallet first.");
+                    return;
+                }
+
+                const parsedAmount = parseUnits(vaultAmount, decimals);
+
+                setVaultSuccess('Withdrawing from Vault...');
+                const txHash = await writeContractAsync({
+                    address: escrowAddress as `0x${string}`,
+                    abi: ESCROW_ABI,
+                    functionName: 'withdraw',
+                    args: [tokenAddress as `0x${string}`, parsedAmount],
+                    chainId
+                });
+                await waitForTransactionReceipt(config, { hash: txHash });
+                setVaultSuccess('Withdrawal successful!');
+            } else {
+                // Bot Wallet
+                await api.wallet.withdrawFromVault(amount, 'USDC', vaultChain);
+                setVaultSuccess('Withdrawal successful!');
             }
-
-            // Bot Wallet
-            await api.wallet.withdrawFromVault(amount, 'USDC', vaultChain);
-            setVaultSuccess('Withdrawal successful!');
 
             haptic('success');
             setVaultAmount('');
