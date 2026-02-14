@@ -26,8 +26,10 @@ async function main() {
 
     // Background Jobs
     if (env.NODE_ENV !== 'test') {
-        const { startExpiryJob } = await import("./services/jobs");
+        const { startExpiryJob, startLiquiditySyncJob } = await import("./services/jobs");
+        const { escrow } = await import("./services/escrow");
         startExpiryJob();
+        startLiquiditySyncJob(escrow);
     }
 
     console.log("");
