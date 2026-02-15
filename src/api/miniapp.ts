@@ -352,7 +352,7 @@ router.post("/wallet/vault/withdraw", async (req: Request, res: Response) => {
 
 router.get("/orders/:id", async (req: Request, res: Response) => {
     try {
-        const order = await db.getOrderById(req.params.id);
+        const order = await db.getOrderById(req.params.id as string);
         if (!order) return res.status(404).json({ error: "Order not found" });
         res.json({ order });
     } catch (err: any) {
