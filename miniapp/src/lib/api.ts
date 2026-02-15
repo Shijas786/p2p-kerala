@@ -113,6 +113,7 @@ export const api = {
         cancel: (id: string) =>
             request<{ success: boolean }>(`/orders/${id}/cancel`, { method: 'POST' }),
         mine: () => request<{ orders: any[] }>('/orders/mine'),
+        getById: (id: string) => request<{ order: any }>(`/orders/${id}`),
     },
 
     // ---- Trades ----

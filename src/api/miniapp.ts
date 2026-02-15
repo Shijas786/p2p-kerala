@@ -350,9 +350,19 @@ router.post("/wallet/vault/withdraw", async (req: Request, res: Response) => {
 //  ORDERS — Browse, Create, Cancel
 // ═══════════════════════════════════════════════════════════════
 
+router.get("/orders/:id", async (req: Request, res: Response) => {
+    try {
+        const order = await db.getOrderById(req.params.id);
+        if (!order) return res.status(404).json({ error: "Order not found" });
+        res.json({ order });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get("/orders", async (req: Request, res: Response) => {
     try {
-        const type = req.query.type as string | undefined;
+        const type = typeof req.query.type === "string" ? req.query.type : undefined;
         // Increase limit slightly to account for filtered items
         const rawOrders = await db.getActiveOrders(type, undefined, 30);
 

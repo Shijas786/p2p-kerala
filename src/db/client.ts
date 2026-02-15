@@ -158,11 +158,15 @@ class Database {
 
     async getOrderById(orderId: string): Promise<Order | null> {
         const db = this.getClient();
-        const { data } = await db
+        const { data, error } = await db
             .from("orders")
             .select("*, users!inner(username, trust_score, upi_id)")
             .eq("id", orderId)
             .single();
+        if (error) {
+            console.error(`[DB] getOrderById error: ${error.message} (id: ${orderId})`);
+            return null; // Or throw if prefer 404 behavior or actual 500
+        }
         if (!data) return null;
         return {
             ...data,

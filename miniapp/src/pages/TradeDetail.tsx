@@ -60,7 +60,7 @@ interface Props {
 }
 
 export function TradeDetail({ user }: Props) {
-    const { id } = useParams<{ id: string }>();
+    const { id, orderId } = useParams<{ id: string; orderId: string }>();
     const navigate = useNavigate();
     const { address: externalAddress } = useAccount();
 
@@ -71,6 +71,7 @@ export function TradeDetail({ user }: Props) {
     const [error, setError] = useState('');
     const [approveTxHash, setApproveTxHash] = useState<`0x${string}` | undefined>(undefined);
     const [lockTxHash, setLockTxHash] = useState<`0x${string}` | undefined>(undefined);
+    const [order, setOrder] = useState<any>(null);
 
     // Wagmi Hooks
     const { writeContractAsync } = useWriteContract();
@@ -90,12 +91,29 @@ export function TradeDetail({ user }: Props) {
     const isExternalWallet = user?.wallet_type === 'external';
     // const needsApproval = trade && allowance !== undefined && allowance < parseUnits(trade.amount.toString(), 6);
     // TypeScript fix for allowance comparison:
-    const tradeAmountBigInt = trade ? parseUnits(trade.amount.toString(), 6) : BigInt(0);
+    const tradeAmountBigInt = (trade || order) ? parseUnits((trade || order).amount.toString(), 6) : BigInt(0);
     const needsApproval = allowance !== undefined && allowance < tradeAmountBigInt;
 
     useEffect(() => {
-        loadTrade();
-    }, [id]);
+        if (id) {
+            loadTrade();
+        } else if (orderId) {
+            loadOrder();
+        }
+    }, [id, orderId]);
+
+    async function loadOrder() {
+        if (!orderId) return;
+        setLoading(true);
+        try {
+            const { order: data } = await api.orders.getById(orderId);
+            setOrder(data);
+        } catch (err: any) {
+            setError(err.message || 'Failed to load order');
+        } finally {
+            setLoading(false);
+        }
+    }
 
     async function loadTrade() {
         if (!id) return;
@@ -103,8 +121,27 @@ export function TradeDetail({ user }: Props) {
         try {
             const { trade: data } = await api.trades.getById(id);
             setTrade(data);
-        } catch { } finally {
+        } catch (err: any) {
+            setError(err.message || 'Failed to load trade');
+        } finally {
             setLoading(false);
+        }
+    }
+
+    async function handleCreateTrade() {
+        if (!order) return;
+        haptic('heavy');
+        setActionLoading(true);
+        setError('');
+        try {
+            const { trade: newTrade } = await api.trades.create(order.id, order.amount);
+            haptic('success');
+            navigate(`/trade/${newTrade.id}`, { replace: true });
+        } catch (err: any) {
+            setError(err.message || 'Failed to initiate trade');
+            haptic('error');
+        } finally {
+            setActionLoading(false);
         }
     }
 
@@ -327,12 +364,13 @@ export function TradeDetail({ user }: Props) {
         );
     }
 
-    if (!trade) {
+    if (!trade && !order) {
         return (
             <div className="page">
                 <div className="empty-state">
                     <div className="icon">❓</div>
-                    <h3>Trade not found</h3>
+                    <h3>{orderId ? 'Order' : 'Trade'} not found</h3>
+                    {error && <p className="text-red text-xs mt-2">{error}</p>}
                     <button className="btn btn-primary btn-sm mt-3" onClick={() => navigate('/')}>
                         Go Home
                     </button>
@@ -341,7 +379,9 @@ export function TradeDetail({ user }: Props) {
         );
     }
 
-    const currentStep = getStepIndex(trade.status);
+    // Use order details during initiation
+    const disp = trade || order;
+    const currentStep = trade ? getStepIndex(trade.status) : -1;
 
     return (
         <div className="page animate-in">
@@ -355,10 +395,10 @@ export function TradeDetail({ user }: Props) {
             {/* Amount Card */}
             <div className="td-amount-card card-glass glow-green">
                 <div className="td-amount font-mono">
-                    {trade.amount} <span className="text-muted">{trade.token}</span>
+                    {disp.amount} <span className="text-muted">{disp.token}</span>
                 </div>
                 <div className="td-fiat font-mono text-secondary mb-2">
-                    ₹{trade.fiat_amount?.toLocaleString()} @ ₹{trade.rate?.toLocaleString()}
+                    ₹{disp.fiat_amount?.toLocaleString() || (disp.amount * disp.rate).toLocaleString()} @ ₹{disp.rate?.toLocaleString()}
                 </div>
 
                 {/* Fee Breakdown */}
@@ -369,17 +409,32 @@ export function TradeDetail({ user }: Props) {
                     </div>
                     <div className="flex justify-between">
                         <span className="text-orange">Seller Locked:</span>
-                        <span className="font-mono">{parseFloat(trade.amount).toFixed(4)}</span>
+                        <span className="font-mono">{parseFloat(disp.amount).toFixed(4)}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-muted">You (Buyer) Pay Fiat for:</span>
-                        <span className="font-mono">{(parseFloat(trade.amount) * 0.995).toFixed(4)}</span>
+                        <span className="text-muted">You ({disp.type === 'sell' ? 'Buyer' : 'Seller'}) Pay Fiat for:</span>
+                        <span className="font-mono">{(parseFloat(disp.amount) * 0.995).toFixed(4)}</span>
                     </div>
                     <div className="flex justify-between font-bold">
-                        <span className="text-green">You (Buyer) Receive Crypto:</span>
-                        <span className="font-mono">{(parseFloat(trade.amount) * 0.99).toFixed(4)}</span>
+                        <span className="text-green">You ({disp.type === 'sell' ? 'Buyer' : 'Seller'}) Receive Crypto:</span>
+                        <span className="font-mono">{(parseFloat(disp.amount) * 0.99).toFixed(4)}</span>
                     </div>
                 </div>
+
+                {orderId && (
+                    <div className="mt-4">
+                        <button
+                            className="btn btn-primary btn-block btn-lg glow-green"
+                            onClick={handleCreateTrade}
+                            disabled={actionLoading}
+                        >
+                            {actionLoading ? <span className="spinner" /> : `Confirm & Start ${disp.type === 'sell' ? 'Buy' : 'Sell'}`}
+                        </button>
+                        <p className="text-[10px] text-muted text-center mt-2">
+                            By clicking confirm, you agree to start a secure P2P trade.
+                        </p>
+                    </div>
+                )}
 
                 {showLockUI && isSeller && (
                     <div className="mt-2 p-2 bg-warning-soft rounded text-sm text-warning">
@@ -541,7 +596,7 @@ export function TradeDetail({ user }: Props) {
                         ⚠️ Raise Dispute
                     </button>
                 )}
-                {trade.status === 'completed' && (
+                {trade && trade.status === 'completed' && (
                     <div className="td-completed text-center animate-in">
                         <span className="td-check">🎉</span>
                         <h3 className="text-green">Trade Completed!</h3>
