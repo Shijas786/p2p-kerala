@@ -178,13 +178,21 @@ class Database {
 
     async getUserOrders(userId: string): Promise<Order[]> {
         const db = this.getClient();
-        const { data } = await db
+        const { data, error } = await db
             .from("orders")
-            .select("*")
+            .select("*, users!inner(username, trust_score, completed_trades, wallet_address)")
             .eq("user_id", userId)
-            .in("status", ["active", "paused"])
+            .in("status", ["active", "paused", "filled"])
             .order("created_at", { ascending: false });
-        return (data || []) as Order[];
+
+        if (error) throw new Error(`Failed to get user orders: ${error.message}`);
+
+        return (data || []).map((d: any) => ({
+            ...d,
+            username: d.users?.username,
+            trust_score: d.users?.trust_score,
+            wallet_address: d.users?.wallet_address,
+        })) as Order[];
     }
 
     async getReservedAmount(userId: string, token: string, chain: string): Promise<number> {

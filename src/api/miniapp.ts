@@ -393,9 +393,13 @@ router.get("/orders", async (req: Request, res: Response) => {
 router.get("/orders/mine", async (req: Request, res: Response) => {
     try {
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
-        if (!user) return res.json({ orders: [] });
+        if (!user) {
+            console.log(`[MINIAPP] /orders/mine: User not found for Telegram ID ${req.telegramUser!.id}`);
+            return res.json({ orders: [] });
+        }
 
         const orders = await db.getUserOrders(user.id);
+        console.log(`[MINIAPP] /orders/mine: Found ${orders.length} orders for user ${user.username} (ID: ${user.id})`);
         res.json({ orders });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
