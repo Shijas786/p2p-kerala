@@ -388,7 +388,7 @@ export function TradeDetail({ user }: Props) {
             <div className="page-header">
                 <div className="flex items-center justify-between">
                     <h1 className="page-title">Trade</h1>
-                    <span className="font-mono text-xs text-muted">#{trade.id.slice(0, 8)}</span>
+                    <span className="font-mono text-xs text-muted">#{disp.id.slice(0, 8)}</span>
                 </div>
             </div>
 
@@ -499,32 +499,34 @@ export function TradeDetail({ user }: Props) {
             )}
 
             {/* Normal Trade Info (Status, etc) */}
-            <div className="td-info card">
-                <div className="td-info-row">
-                    <span className="text-muted">Status</span>
-                    <span className={`font-semibold status-badge ${trade.status}`}>
-                        {trade.status.replace('_', ' ').toUpperCase()}
-                    </span>
+            {trade && (
+                <div className="td-info card">
+                    <div className="td-info-row">
+                        <span className="text-muted">Status</span>
+                        <span className={`font-semibold status-badge ${trade.status}`}>
+                            {trade.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                    </div>
+                    {trade.payment_proofs?.[0]?.utr && (
+                        <div className="td-info-row border-t pt-2 mt-2">
+                            <span className="text-muted">Submitted UTR</span>
+                            <span className="font-mono font-bold text-lg select-all">{trade.payment_proofs[0].utr}</span>
+                        </div>
+                    )}
+                    {trade.escrow_tx_hash && (
+                        <div className="td-info-row border-t pt-2 mt-2">
+                            <span className="text-muted">Escrow TX</span>
+                            <a href={`https://basescan.org/tx/${trade.escrow_tx_hash}`} target="_blank" rel="noopener" className="text-green text-sm font-mono truncate">
+                                {trade.escrow_tx_hash.slice(0, 12)}...
+                            </a>
+                        </div>
+                    )}
                 </div>
-                {trade.payment_proofs?.[0]?.utr && (
-                    <div className="td-info-row border-t pt-2 mt-2">
-                        <span className="text-muted">Submitted UTR</span>
-                        <span className="font-mono font-bold text-lg select-all">{trade.payment_proofs[0].utr}</span>
-                    </div>
-                )}
-                {trade.escrow_tx_hash && (
-                    <div className="td-info-row border-t pt-2 mt-2">
-                        <span className="text-muted">Escrow TX</span>
-                        <a href={`https://basescan.org/tx/${trade.escrow_tx_hash}`} target="_blank" rel="noopener" className="text-green text-sm font-mono truncate">
-                            {trade.escrow_tx_hash.slice(0, 12)}...
-                        </a>
-                    </div>
-                )}
-            </div>
+            )}
 
             {/* Standard Actions (Fiat Sent, Release, Dispute) */}
             <div className="td-actions">
-                {trade.status === 'in_escrow' && !isSeller && (
+                {trade && trade.status === 'in_escrow' && !isSeller && (
                     <div className="card-glass border-green p-3 animate-in">
                         <h4 className="mb-2 text-sm font-bold uppercase tracking-wider">📤 Confirm Transfer</h4>
                         <p className="text-xs text-muted mb-3">Paste the 12-digit UTR/Reference number from your banking app below.</p>
@@ -550,7 +552,7 @@ export function TradeDetail({ user }: Props) {
                     </div>
                 )}
 
-                {trade.status === 'fiat_sent' && isSeller && (
+                {trade && trade.status === 'fiat_sent' && isSeller && (
                     <div className="card-glass border-orange p-3 animate-in">
                         <h4 className="mb-1 text-sm font-bold uppercase tracking-wider text-orange">📢 Payment Reported</h4>
                         <p className="text-xs text-muted mb-3">The buyer has submitted a UTR. Follow these steps to verify:</p>
@@ -580,14 +582,14 @@ export function TradeDetail({ user }: Props) {
                     </div>
                 )}
 
-                {trade.status === 'fiat_sent' && !isSeller && (
+                {trade && trade.status === 'fiat_sent' && !isSeller && (
                     <div className="text-center p-4">
                         <div className="loading-dots mb-2">Waiting for seller to release...</div>
                         <p className="text-xs text-muted">The seller is verifying your UTR.</p>
                     </div>
                 )}
 
-                {['in_escrow', 'fiat_sent'].includes(trade.status) && (
+                {trade && ['in_escrow', 'fiat_sent'].includes(trade.status) && (
                     <button
                         className="btn btn-danger btn-block mt-2"
                         onClick={raiseDispute}
