@@ -143,9 +143,7 @@ class Database {
             query = query.eq("type", type);
         }
 
-        // Filter expired (expires_at is null OR > now)
-        const now = new Date().toISOString();
-        query = query.or(`expires_at.is.null,expires_at.gt.${now}`);
+
 
         const { data, error } = await query;
         if (error) throw new Error(`Failed to get orders: ${error.message}`);

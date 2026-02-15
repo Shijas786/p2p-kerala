@@ -458,7 +458,7 @@ router.post("/orders", async (req: Request, res: Response) => {
             fiat_currency: "INR",
             payment_methods: payment_methods || ["UPI"],
             // payment_details: {}, // Optional in schema
-            expires_at: expiresAt
+
         });
 
         res.json({ order });
