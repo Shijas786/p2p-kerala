@@ -408,6 +408,21 @@ router.get("/orders/mine", async (req: Request, res: Response) => {
     }
 });
 
+// Temporary debug endpoint to verify logs on production
+router.get("/debug/logs", async (req: Request, res: Response) => {
+    try {
+        const fs = require('fs');
+        if (fs.existsSync('debug_api.log')) {
+            const content = fs.readFileSync('debug_api.log', 'utf8');
+            res.header('Content-Type', 'text/plain').send(content);
+        } else {
+            res.send("No logs found yet.");
+        }
+    } catch (err: any) {
+        res.status(500).send(err.message);
+    }
+});
+
 router.post("/orders", async (req: Request, res: Response) => {
     try {
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
