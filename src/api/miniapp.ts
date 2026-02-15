@@ -96,6 +96,10 @@ function validateInitData(req: Request, res: Response, next: NextFunction) {
             req.telegramUser = JSON.parse(userStr);
         }
 
+        if (!req.telegramUser) {
+            return res.status(401).json({ error: "User data missing from init data" });
+        }
+
         const authDate = parseInt(params.get("auth_date") || "0");
         const now = Math.floor(Date.now() / 1000);
         if (now - authDate > 86400 && env.NODE_ENV !== "development") {
@@ -392,35 +396,34 @@ router.get("/orders", async (req: Request, res: Response) => {
 
 router.get("/orders/mine", async (req: Request, res: Response) => {
     try {
-        const user = await db.getUserByTelegramId(req.telegramUser!.id);
-        const logMsg = `[${new Date().toISOString()}] /orders/mine: telegram_id=${req.telegramUser!.id} user_found=${!!user} user_id=${user?.id} username=${user?.username}\n`;
-        require('fs').appendFileSync('debug_api.log', logMsg);
+        if (!req.telegramUser) {
+            return res.status(401).json({ error: "User not identified" });
+        }
+
+        const user = await db.getUserByTelegramId(req.telegramUser.id);
+        console.log(`[MINIAPP] /orders/mine: tg_id=${req.telegramUser.id} user_found=${!!user}`);
 
         if (!user) {
             return res.json({ orders: [] });
         }
 
         const orders = await db.getUserOrders(user.id);
-        require('fs').appendFileSync('debug_api.log', `Found ${orders.length} orders\n`);
+        console.log(`[MINIAPP] /orders/mine: Found ${orders.length} orders for ${user.username}`);
         res.json({ orders });
     } catch (err: any) {
+        console.error("/orders/mine error:", err);
         res.status(500).json({ error: err.message });
     }
 });
 
-// Temporary debug endpoint to verify logs on production
-router.get("/debug/logs", async (req: Request, res: Response) => {
-    try {
-        const fs = require('fs');
-        if (fs.existsSync('debug_api.log')) {
-            const content = fs.readFileSync('debug_api.log', 'utf8');
-            res.header('Content-Type', 'text/plain').send(content);
-        } else {
-            res.send("No logs found yet.");
-        }
-    } catch (err: any) {
-        res.status(500).send(err.message);
-    }
+// Temporary health/stats for debugging
+router.get("/debug/status", async (req: Request, res: Response) => {
+    res.json({
+        ok: true,
+        env: env.NODE_ENV,
+        node: process.version,
+        timestamp: new Date().toISOString()
+    });
 });
 
 router.post("/orders", async (req: Request, res: Response) => {
