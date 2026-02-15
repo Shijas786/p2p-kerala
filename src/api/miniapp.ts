@@ -393,13 +393,15 @@ router.get("/orders", async (req: Request, res: Response) => {
 router.get("/orders/mine", async (req: Request, res: Response) => {
     try {
         const user = await db.getUserByTelegramId(req.telegramUser!.id);
+        const logMsg = `[${new Date().toISOString()}] /orders/mine: telegram_id=${req.telegramUser!.id} user_found=${!!user} user_id=${user?.id} username=${user?.username}\n`;
+        require('fs').appendFileSync('debug_api.log', logMsg);
+
         if (!user) {
-            console.log(`[MINIAPP] /orders/mine: User not found for Telegram ID ${req.telegramUser!.id}`);
             return res.json({ orders: [] });
         }
 
         const orders = await db.getUserOrders(user.id);
-        console.log(`[MINIAPP] /orders/mine: Found ${orders.length} orders for user ${user.username} (ID: ${user.id})`);
+        require('fs').appendFileSync('debug_api.log', `Found ${orders.length} orders\n`);
         res.json({ orders });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
