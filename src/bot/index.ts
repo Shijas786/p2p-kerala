@@ -2094,14 +2094,12 @@ bot.on("callback_query:data", async (ctx) => {
                     const tokenSymbol = order.token || "USDC";
                     const tokenAddress = tokenSymbol === "USDT" ? env.USDT_ADDRESS : env.USDC_ADDRESS;
 
-                    const feeAmount = order.amount * env.FEE_PERCENTAGE;
-                    const totalRequired = order.amount + feeAmount;
-
-                    // 1. Check Seller's Balance (Must cover Amount + Fee)
+                    // 1. Check Seller's Balance (Baseline Amount)
                     const balance = await wallet.getTokenBalance(seller.wallet_address!, tokenAddress);
+                    const totalRequired = order.amount;
                     if (parseFloat(balance) < totalRequired) {
                         await ctx.editMessageText(
-                            `❌ *Insufficient ${tokenSymbol} Balance*\n\nYou need *${formatUSDC(totalRequired, tokenSymbol)}* (incl. fee) but have *${formatUSDC(parseFloat(balance), tokenSymbol)}*.\n\nDeposit funds to your wallet: \`${seller.wallet_address}\``,
+                            `❌ *Insufficient ${tokenSymbol} Balance*\n\nYou need *${formatUSDC(totalRequired, tokenSymbol)}* but have *${formatUSDC(parseFloat(balance), tokenSymbol)}*.\n\nDeposit funds to your wallet: \`${seller.wallet_address}\``,
                             { parse_mode: "Markdown" }
                         );
                         return;

@@ -405,7 +405,6 @@ export function TradeDetail({ user }: Props) {
             {showLockUI && isSeller && isExternalWallet && (
                 <div className="p-section card border-yellow">
                     <h3 className="mb-2">🔒 Escrow Lock</h3>
-                    <h3 className="mb-2">🔒 Escrow Lock</h3>
                     <p className="text-sm text-muted mb-3">
                         You must lock <b>{trade.amount} {trade.token}</b> in the smart contract.
                     </p>

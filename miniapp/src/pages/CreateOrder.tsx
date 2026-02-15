@@ -194,9 +194,7 @@ export function CreateOrder() {
         }
     }
 
-    const fiatTotal = amount && rate
-        ? (parseFloat(amount) * parseFloat(rate)).toFixed(2)
-        : '0.00';
+
 
     return (
         <div className="page animate-in">
@@ -322,7 +320,7 @@ export function CreateOrder() {
                                 <div className="flex justify-between items-center text-xs mb-1">
                                     <span className="text-muted uppercase">Total Fiat</span>
                                     <span className="font-mono font-bold text-green text-lg">
-                                        ₹{parseFloat(fiatTotal).toLocaleString()}
+                                        ₹{(parseFloat(amount) * 0.995 * parseFloat(rate)).toLocaleString()}
                                     </span>
                                 </div>
                                 <div className="border-t border-white/10 my-2"></div>
@@ -331,21 +329,25 @@ export function CreateOrder() {
                                     <span>0.5% Buyer + 0.5% Seller</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[10px] mt-1">
-                                    <span className="text-orange">Seller Locks:</span>
-                                    <span className="font-mono">{(parseFloat(amount) * 1.005).toFixed(4)} {token}</span>
+                                    <span className="text-orange">You (Seller) Lock:</span>
+                                    <span className="font-mono">{(parseFloat(amount)).toFixed(4)} {token}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-muted">Ad Displays:</span>
+                                    <span className="font-mono text-secondary">{(parseFloat(amount) * 0.995).toFixed(4)} {token}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[10px]">
                                     <span className="text-green">Buyer Receives:</span>
-                                    <span className="font-mono">{(parseFloat(amount) * 0.995).toFixed(4)} {token}</span>
+                                    <span className="font-mono">{(parseFloat(amount) * 0.99).toFixed(4)} {token}</span>
                                 </div>
                             </div>
                         )}
 
                         {type === 'sell' && (
-                            <div className={`co-vault-box card-glass mb-3 ${availableBalance < (parseFloat(amount || '0') * 1.005) ? 'border-orange' : 'border-green'}`}>
+                            <div className={`co-vault-box card-glass mb-3 ${availableBalance < parseFloat(amount || '0') ? 'border-orange' : 'border-green'}`}>
                                 <div className="flex justify-between items-center text-[10px]">
                                     <span className="text-muted uppercase">Vault Balance</span>
-                                    <span className={availableBalance < (parseFloat(amount || '0') * 1.005) ? 'text-orange' : 'text-green'}>
+                                    <span className={availableBalance < parseFloat(amount || '0') ? 'text-orange' : 'text-green'}>
                                         {vaultBalance !== undefined ? availableBalance.toFixed(2) : '...'} {token}
                                     </span>
                                 </div>
@@ -357,7 +359,7 @@ export function CreateOrder() {
                             <button
                                 className={`btn-publish flex-[2] ${needsDeposit && !isExternalUser ? 'disabled' : ''}`}
                                 onClick={() => {
-                                    const reqBalance = parseFloat(amount || '0') * 1.005;
+                                    const reqBalance = parseFloat(amount || '0');
                                     const needsDep = type === 'sell' && availableBalance < reqBalance;
 
                                     if (isExternalUser) {
