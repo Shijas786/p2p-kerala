@@ -67,7 +67,9 @@ async function main() {
             res.json({
                 total_users: stats.total_users,
                 total_volume_usdc: stats.total_volume_usdc || 0,
-                active_orders: stats.active_orders
+                active_orders: stats.active_orders,
+                fee_percentage: env.FEE_PERCENTAGE,
+                fee_bps: parseInt(env.FEE_BPS)
             });
         } catch (e) {
             console.error("API Error:", e);

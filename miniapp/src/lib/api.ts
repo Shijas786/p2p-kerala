@@ -171,6 +171,12 @@ export const api = {
 
     // ---- Stats ----
     stats: {
-        get: () => request<{ total_users: number; total_volume_usdc: number; active_orders: number }>('/stats'),
+        get: () => request<{
+            total_users: number;
+            total_volume_usdc: number;
+            active_orders: number;
+            fee_percentage: number;
+            fee_bps: number;
+        }>('/stats'),
     },
 };

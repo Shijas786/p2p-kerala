@@ -72,6 +72,7 @@ export function TradeDetail({ user }: Props) {
     const [approveTxHash, setApproveTxHash] = useState<`0x${string}` | undefined>(undefined);
     const [lockTxHash, setLockTxHash] = useState<`0x${string}` | undefined>(undefined);
     const [order, setOrder] = useState<any>(null);
+    const [feePercentage, setFeePercentage] = useState<number>(0.01);
 
     // Wagmi Hooks
     const { writeContractAsync } = useWriteContract();
@@ -100,6 +101,10 @@ export function TradeDetail({ user }: Props) {
         } else if (orderId) {
             loadOrder();
         }
+        // Fetch fee
+        api.stats.get().then(data => {
+            if (data.fee_percentage) setFeePercentage(data.fee_percentage);
+        }).catch(console.error);
     }, [id, orderId]);
 
     async function loadOrder() {
@@ -404,8 +409,8 @@ export function TradeDetail({ user }: Props) {
                 {/* Fee Breakdown */}
                 <div className="text-[10px] bg-black/20 p-2 rounded border border-white/5">
                     <div className="flex justify-between text-muted mb-1">
-                        <span>Commission (1%)</span>
-                        <span>0.5% Buyer + 0.5% Seller</span>
+                        <span>Commission ({(feePercentage * 100).toFixed(1)}%)</span>
+                        <span>{(feePercentage * 50).toFixed(1)}% Buyer + {(feePercentage * 50).toFixed(1)}% Seller</span>
                     </div>
                     <div className="flex justify-between">
                         <span className="text-orange">Seller Locked:</span>
@@ -413,11 +418,11 @@ export function TradeDetail({ user }: Props) {
                     </div>
                     <div className="flex justify-between">
                         <span className="text-muted">You ({disp.type === 'sell' ? 'Buyer' : 'Seller'}) Pay Fiat for:</span>
-                        <span className="font-mono">{(parseFloat(disp.amount) * 0.995).toFixed(4)}</span>
+                        <span className="font-mono">{(parseFloat(disp.amount) * (1 - (feePercentage / 2))).toFixed(4)}</span>
                     </div>
                     <div className="flex justify-between font-bold">
                         <span className="text-green">You ({disp.type === 'sell' ? 'Buyer' : 'Seller'}) Receive Crypto:</span>
-                        <span className="font-mono">{(parseFloat(disp.amount) * 0.99).toFixed(4)}</span>
+                        <span className="font-mono">{(parseFloat(disp.amount) * (1 - feePercentage)).toFixed(4)}</span>
                     </div>
                 </div>
 

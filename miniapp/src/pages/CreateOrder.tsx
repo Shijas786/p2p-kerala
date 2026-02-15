@@ -27,6 +27,7 @@ export function CreateOrder() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [txStep, setTxStep] = useState<'idle' | 'approving' | 'depositing' | 'creating'>('idle');
+    const [feePercentage, setFeePercentage] = useState<number>(0.01); // Default to 1%
 
     // Decimal logic synchronized with backend EscrowService
     const getDecimals = () => {
@@ -83,6 +84,10 @@ export function CreateOrder() {
                 setReserved(parseFloat(res || '0'));
             }).catch(console.error);
         }
+        // Fetch fee from stats
+        api.stats.get().then(data => {
+            if (data.fee_percentage) setFeePercentage(data.fee_percentage);
+        }).catch(console.error);
     }, [type, chain]);
 
     const physicalBalance = vaultBalance !== undefined ? parseFloat(formatUnits(vaultBalance as bigint, decimals)) : 0;
@@ -320,13 +325,13 @@ export function CreateOrder() {
                                 <div className="flex justify-between items-center text-xs mb-1">
                                     <span className="text-muted uppercase">Total Fiat</span>
                                     <span className="font-mono font-bold text-green text-lg">
-                                        ₹{(parseFloat(amount) * 0.995 * parseFloat(rate)).toLocaleString()}
+                                        ₹{(parseFloat(amount) * (1 - (feePercentage / 2)) * parseFloat(rate)).toLocaleString()}
                                     </span>
                                 </div>
                                 <div className="border-t border-white/10 my-2"></div>
                                 <div className="flex justify-between items-center text-[10px] text-muted">
-                                    <span>Trading Fee (1%)</span>
-                                    <span>0.5% Buyer + 0.5% Seller</span>
+                                    <span>Trading Fee ({(feePercentage * 100).toFixed(1)}%)</span>
+                                    <span>{(feePercentage * 50).toFixed(1)}% Buyer + {(feePercentage * 50).toFixed(1)}% Seller</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[10px] mt-1">
                                     <span className="text-orange">You (Seller) Lock:</span>
@@ -334,11 +339,11 @@ export function CreateOrder() {
                                 </div>
                                 <div className="flex justify-between items-center text-[10px]">
                                     <span className="text-muted">Ad Displays:</span>
-                                    <span className="font-mono text-secondary">{(parseFloat(amount) * 0.995).toFixed(4)} {token}</span>
+                                    <span className="font-mono text-secondary">{(parseFloat(amount) * (1 - (feePercentage / 2))).toFixed(4)} {token}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-[10px]">
                                     <span className="text-green">Buyer Receives:</span>
-                                    <span className="font-mono">{(parseFloat(amount) * 0.99).toFixed(4)} {token}</span>
+                                    <span className="font-mono">{(parseFloat(amount) * (1 - feePercentage)).toFixed(4)} {token}</span>
                                 </div>
                             </div>
                         )}

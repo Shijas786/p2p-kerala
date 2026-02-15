@@ -570,9 +570,9 @@ router.post("/trades", async (req: Request, res: Response) => {
             return res.status(409).json({ error: "Order already filled or no longer active" });
         }
 
-        const fiatAmount = tradeAmount * 0.995 * order.rate; // 0.5% Seller Fee deducted from fiat
-        const feeAmount = tradeAmount * 0.01;      // Contract BPS is 100
-        const buyerReceives = tradeAmount - feeAmount; // Gets 99% of locked amount (0.5% Buyer Fee)
+        const fiatAmount = tradeAmount * (1 - (env.FEE_PERCENTAGE / 2)) * order.rate; // 0.5% Seller Fee deducted from fiat
+        const feeAmount = tradeAmount * env.FEE_PERCENTAGE;      // Total Fee (usually 1%)
+        const buyerReceives = tradeAmount - feeAmount; // Gets 99% of locked amount (split 1% total fee)
 
         try {
             // ═══ ESCROW: Lock seller's funds on-chain ═══
