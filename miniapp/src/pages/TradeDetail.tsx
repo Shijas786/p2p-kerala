@@ -119,6 +119,7 @@ export function TradeDetail({ user }: Props) {
                 address: tokenAddress as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'approve',
+                // Approve Amount
                 args: [ESCROW_CONTRACT_ADDRESS, tradeAmountBigInt],
             });
             setApproveTxHash(hash);
@@ -356,12 +357,33 @@ export function TradeDetail({ user }: Props) {
                 <div className="td-amount font-mono">
                     {trade.amount} <span className="text-muted">{trade.token}</span>
                 </div>
-                <div className="td-fiat font-mono text-secondary">
+                <div className="td-fiat font-mono text-secondary mb-2">
                     ₹{trade.fiat_amount?.toLocaleString()} @ ₹{trade.rate?.toLocaleString()}
                 </div>
+
+                {/* Fee Breakdown */}
+                <div className="text-[10px] bg-black/20 p-2 rounded border border-white/5">
+                    <div className="flex justify-between text-muted mb-1">
+                        <span>Commission (1%)</span>
+                        <span>0.5% Buyer + 0.5% Seller</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-orange">Seller Locked:</span>
+                        <span className="font-mono">{parseFloat(trade.amount).toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span className="text-muted">You (Buyer) Pay Fiat for:</span>
+                        <span className="font-mono">{(parseFloat(trade.amount) * 0.995).toFixed(4)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold">
+                        <span className="text-green">You (Buyer) Receive Crypto:</span>
+                        <span className="font-mono">{(parseFloat(trade.amount) * 0.99).toFixed(4)}</span>
+                    </div>
+                </div>
+
                 {showLockUI && isSeller && (
                     <div className="mt-2 p-2 bg-warning-soft rounded text-sm text-warning">
-                        Action Required: Lock funds to start escrow
+                        Action Required: Lock funds ({trade.amount} {trade.token}) to start escrow.
                     </div>
                 )}
             </div>
@@ -383,8 +405,9 @@ export function TradeDetail({ user }: Props) {
             {showLockUI && isSeller && isExternalWallet && (
                 <div className="p-section card border-yellow">
                     <h3 className="mb-2">🔒 Escrow Lock</h3>
+                    <h3 className="mb-2">🔒 Escrow Lock</h3>
                     <p className="text-sm text-muted mb-3">
-                        You must lock <b>{trade.amount} {trade.token}</b> (+fee) in the smart contract.
+                        You must lock <b>{trade.amount} {trade.token}</b> in the smart contract.
                     </p>
                     {needsApproval ? (
                         <button

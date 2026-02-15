@@ -560,9 +560,9 @@ router.post("/trades", async (req: Request, res: Response) => {
             return res.status(409).json({ error: "Order already filled or no longer active" });
         }
 
-        const fiatAmount = tradeAmount * order.rate;
-        const feeAmount = tradeAmount * 0.005;
-        const buyerReceives = tradeAmount - feeAmount;
+        const fiatAmount = tradeAmount * 0.995 * order.rate; // 0.5% Seller Fee deducted from fiat
+        const feeAmount = tradeAmount * 0.01;      // Contract BPS is 100
+        const buyerReceives = tradeAmount - feeAmount; // Gets 99% of locked amount (0.5% Buyer Fee)
 
         try {
             // ═══ ESCROW: Lock seller's funds on-chain ═══
@@ -594,8 +594,12 @@ router.post("/trades", async (req: Request, res: Response) => {
                     });
                 }
 
-                // 2. Relayer locks funds from Vault
-                console.log(`[TRADES] Relayer creating trade for ${seller.wallet_address} -> ${buyer.wallet_address} on ${order.chain}`);
+                // 2. Relayer locks funds from Vault (Amount)
+                // Contract takes 1% (FEE_BPS=100) on release.
+                // Buyer pays fiat for Amount * 0.995.
+                // Buyer receives Amount * 0.99.
+
+                console.log(`[TRADES] Relayer creating trade for ${seller.wallet_address} -> ${buyer.wallet_address} on ${order.chain}. Lock: ${tradeAmount}`);
                 const tradeIdStr = await escrow.createRelayedTrade(
                     seller.wallet_address!,
                     buyer.wallet_address!,

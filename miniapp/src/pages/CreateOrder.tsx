@@ -319,20 +319,33 @@ export function CreateOrder() {
                         {/* Summary & Vault */}
                         {amount && rate && (
                             <div className="co-summary-mini card-glass glow-green mb-3">
-                                <div className="flex justify-between items-center text-xs">
+                                <div className="flex justify-between items-center text-xs mb-1">
                                     <span className="text-muted uppercase">Total Fiat</span>
                                     <span className="font-mono font-bold text-green text-lg">
                                         ₹{parseFloat(fiatTotal).toLocaleString()}
                                     </span>
                                 </div>
+                                <div className="border-t border-white/10 my-2"></div>
+                                <div className="flex justify-between items-center text-[10px] text-muted">
+                                    <span>Trading Fee (1%)</span>
+                                    <span>0.5% Buyer + 0.5% Seller</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[10px] mt-1">
+                                    <span className="text-orange">Seller Locks:</span>
+                                    <span className="font-mono">{(parseFloat(amount) * 1.005).toFixed(4)} {token}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-green">Buyer Receives:</span>
+                                    <span className="font-mono">{(parseFloat(amount) * 0.995).toFixed(4)} {token}</span>
+                                </div>
                             </div>
                         )}
 
                         {type === 'sell' && (
-                            <div className={`co-vault-box card-glass mb-3 ${needsDeposit ? 'border-orange' : 'border-green'}`}>
+                            <div className={`co-vault-box card-glass mb-3 ${availableBalance < (parseFloat(amount || '0') * 1.005) ? 'border-orange' : 'border-green'}`}>
                                 <div className="flex justify-between items-center text-[10px]">
                                     <span className="text-muted uppercase">Vault Balance</span>
-                                    <span className={needsDeposit ? 'text-orange' : 'text-green'}>
+                                    <span className={availableBalance < (parseFloat(amount || '0') * 1.005) ? 'text-orange' : 'text-green'}>
                                         {vaultBalance !== undefined ? availableBalance.toFixed(2) : '...'} {token}
                                     </span>
                                 </div>
@@ -344,10 +357,13 @@ export function CreateOrder() {
                             <button
                                 className={`btn-publish flex-[2] ${needsDeposit && !isExternalUser ? 'disabled' : ''}`}
                                 onClick={() => {
+                                    const reqBalance = parseFloat(amount || '0') * 1.005;
+                                    const needsDep = type === 'sell' && availableBalance < reqBalance;
+
                                     if (isExternalUser) {
                                         if (!isConnected) appKit.open(); else submit();
                                     } else {
-                                        if (needsDeposit) navigate('/wallet'); else submit();
+                                        if (needsDep) navigate('/wallet'); else submit();
                                     }
                                 }}
                                 disabled={submitting || (type === 'sell' && (loadingVault || (isExternalUser && loadingAllowance)))}
@@ -365,7 +381,9 @@ export function CreateOrder() {
                                 ) : (isExternalUser && !isConnected) ? (
                                     'CONNECT WALLET'
                                 ) : (
-                                    needsDeposit ? (isExternalUser ? `DEPOSIT & PUBLISH` : 'INSUFFICIENT BALANCE') : '🚀 PUBLISH'
+                                    (type === 'sell' && availableBalance < (parseFloat(amount || '0') * 1.005))
+                                        ? (isExternalUser ? `DEPOSIT & PUBLISH` : 'INSUFFICIENT BALANCE')
+                                        : '🚀 PUBLISH'
                                 )}
                             </button>
                         </div>

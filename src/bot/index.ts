@@ -91,7 +91,7 @@ export async function broadcastTradeSuccess(trade: any, order: any) {
         if (targetGroup) {
             await bot.api.sendMessage(
                 String(targetGroup),
-                `🔥 *JUST SOLD!* 🚀\n\nSomeone just bought *${formatUSDC(trade.amount)}* from @${trade.seller_username || "Seller"}!\n\n⚡ P2P Kerala is active. /start to trade.`,
+                `🔥 *JUST SOLD!* 🚀\n\nSomeone just bought *${formatUSDC(trade.amount * 0.995)}* from @${trade.seller_username || "Seller"}!\n\n⚡ P2P Kerala is active. /start to trade.`,
                 { parse_mode: "Markdown" }
             ).catch(e => console.error(`Group FOMO Broadcast failed:`, e));
         }
@@ -290,7 +290,8 @@ bot.command("start", async (ctx) => {
                     .text("✅ Confirm Order", callbackData)
                     .text("❌ Cancel", `cancel_action:${user.id}`);
 
-                const feeAmt = amount * env.FEE_PERCENTAGE;
+                const totalFee = amount * env.FEE_PERCENTAGE; // 1%
+                const sideFee = amount * 0.005;            // 0.5%
                 const typeLabel = isSell ? "Sell" : "Buy";
 
                 await ctx.reply(
@@ -299,10 +300,15 @@ bot.command("start", async (ctx) => {
                         "",
                         `Amount: ${formatUSDC(amount)}`,
                         `Rate: ${formatINR(rate)}/USDC`,
-                        `Total: ${formatINR(amount * rate)}`,
-                        `Fee (0.5%): ${formatUSDC(feeAmt)}`,
-                        // For sell orders show buyer receives, for buy orders show you pay
-                        isSell ? `Buyer receives: ${formatUSDC(amount - feeAmt)}` : `You receive: ${formatUSDC(amount - feeAmt)}`,
+                        `Total: ${formatINR(amount * 0.995 * rate)}`,
+                        "",
+                        `⚖️ *Commission (1%)*:`,
+                        `• Seller: 0.5% (${formatUSDC(sideFee)})`,
+                        `• Buyer: 0.5% (${formatUSDC(sideFee)})`,
+                        "",
+                        isSell
+                            ? `🔐 *You Lock:* ${formatUSDC(amount)}\n💰 *You Get Paid for:* ${formatUSDC(amount - sideFee)}\n📥 *Buyer Gets:* ${formatUSDC(amount - totalFee)}`
+                            : `🔐 *Seller Locks:* ${formatUSDC(amount)}\n💰 *You Pay for:* ${formatUSDC(amount - sideFee)}\n📥 *You Get:* ${formatUSDC(amount - totalFee)}`,
                         "",
                         " Confirm to list this order?",
                     ].join("\n"),
@@ -1462,14 +1468,15 @@ bot.on("callback_query:data", async (ctx) => {
 
                 const adList = orders.map((o, i) => {
                     const emoji = o.type === "sell" ? "🔴 SELL" : "🟢 BUY";
-                    const available = o.amount - (o.filled_amount || 0);
+                    const totalAvailable = o.amount - (o.filled_amount || 0);
+                    const sellable = totalAvailable * 0.995;
                     const stars = (o.trust_score ?? 0) >= 90 ? "💎" :
                         (o.trust_score ?? 0) >= 70 ? "⭐" : "🟢";
 
                     return [
-                        `${i + 1}. ${emoji} *${formatUSDC(available, o.token)}*`,
+                        `${i + 1}. ${emoji} *${formatUSDC(sellable, o.token)}*`,
                         `   💰 Rate: ${formatINR(o.rate)}/${o.token}`,
-                        `   💵 Total: ${formatINR(available * o.rate)}`,
+                        `   💵 Total: ${formatINR(sellable * o.rate)}`,
                         `   💳 ${o.payment_methods?.join(", ") || "UPI"}`,
                         `   👤 @${o.username || "anon"} ${stars}`,
                         `   🆔 \`${o.id.slice(0, 8)}\``,
@@ -1479,10 +1486,11 @@ bot.on("callback_query:data", async (ctx) => {
                 // Create inline buttons for top 5 ads
                 const keyboard = new InlineKeyboard();
                 orders.slice(0, 5).forEach((o) => {
-                    const available = o.amount - (o.filled_amount || 0);
+                    const totalAvailable = o.amount - (o.filled_amount || 0);
+                    const sellable = totalAvailable * 0.995;
                     const action = o.type === "sell" ? "Buy" : "Sell";
                     keyboard.text(
-                        `${action} ${formatUSDC(available, o.token)} @ ${formatINR(o.rate)}`,
+                        `${action} ${formatUSDC(sellable, o.token)} @ ${formatINR(o.rate)}`,
                         `trade_ad:${o.id}`
                     ).row();
                 });
@@ -1541,9 +1549,10 @@ bot.on("callback_query:data", async (ctx) => {
                 return;
             }
 
-            const available = order.amount - (order.filled_amount || 0);
-            const feeAmount = available * env.FEE_PERCENTAGE;
-            const buyerReceives = available - feeAmount;
+            const totalAvailable = order.amount - (order.filled_amount || 0);
+            const sellable = totalAvailable * 0.995;
+            const buyerFee = totalAvailable * 0.005;
+            const buyerReceives = totalAvailable * 0.99;
             const action = order.type === "sell" ? "BUY from" : "SELL to";
 
             const keyboard = new InlineKeyboard()
@@ -1554,12 +1563,13 @@ bot.on("callback_query:data", async (ctx) => {
                 [
                     `🤝 *${action} this trader?*`,
                     "",
-                    `Amount: *${formatUSDC(available, order.token)}*`,
+                    `Amount: *${formatUSDC(sellable, order.token)}*`,
                     `Rate: *${formatINR(order.rate)}/${order.token}*`,
-                    `Total Fiat: *${formatINR(available * order.rate)}*`,
+                    `Total Fiat: *${formatINR(sellable * order.rate)}*`,
                     "",
-                    `Fee (0.5%): ${formatUSDC(feeAmount, order.token)}`,
-                    `Buyer receives: ${formatUSDC(buyerReceives, order.token)}`,
+                    `⚖️ *Symmetry Fee Split (1%)*:`,
+                    `• Your Fee (0.5%): ${formatUSDC(buyerFee, order.token)}`,
+                    `• You Receive: *${formatUSDC(buyerReceives, order.token)}*`,
                     "",
                     `Payment: ${order.payment_methods?.join(", ") || "UPI"}`,
                     `Trader: ${order.username ? "@" + order.username.replace(/_/g, "\\_") : "anon"} (⭐ ${order.trust_score ?? 0}%)`,
@@ -2022,6 +2032,7 @@ bot.on("callback_query:data", async (ctx) => {
 
                     try {
                         // 3. Relayer creates trade on Smart Contract
+                        // Contract takes 1% (FEE_BPS=100) on release.
                         const tradeId = await escrow.createRelayedTrade(
                             seller.wallet_address!,
                             user.wallet_address!,
@@ -2249,6 +2260,14 @@ bot.on("callback_query:data", async (ctx) => {
                 `Amount: *${formatUSDC(trade.amount, trade.token)}*`,
                 `Fiat: *${formatINR(trade.fiat_amount)}*`,
                 `Rate: ${formatINR(trade.rate)}/${trade.token}`,
+                "",
+                `⚖️ Fee Split (1%):`,
+                isSeller
+                    ? `🔐 You Locked: *${formatUSDC(trade.amount * 1.005, trade.token)}*`
+                    : `🔐 Seller Locked: *${formatUSDC(trade.amount * 1.005, trade.token)}*`,
+                isBuyer
+                    ? `📥 You Receive: *${formatUSDC(trade.amount * 0.995, trade.token)}*`
+                    : `📥 Buyer Receives: *${formatUSDC(trade.amount * 0.995, trade.token)}*`,
                 "",
                 `Partner: ${partner?.username ? "@" + partner.username.replace(/_/g, "\\_") : "anon"}`,
                 `Payment Method: ${trade.payment_method}`,

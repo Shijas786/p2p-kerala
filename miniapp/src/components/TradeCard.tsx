@@ -46,7 +46,7 @@ export function TradeCard({ trade, onTap }: Props) {
             <div className="tc-top">
                 <div className="tc-left">
                     <span className="tc-amount font-mono">
-                        {trade.amount} {trade.token}
+                        {(trade.amount * 0.995).toFixed(2)} {trade.token}
                     </span>
                     <span className="text-sm text-muted">
                         ₹{trade.fiat_amount?.toLocaleString()} @ ₹{trade.rate?.toLocaleString()}

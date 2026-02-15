@@ -22,7 +22,8 @@ interface Props {
 }
 
 export function OrderCard({ order, onTap, showActions = true }: Props) {
-    const available = order.amount - (order.filled_amount || 0);
+    const totalAvailable = order.amount - (order.filled_amount || 0);
+    const available = totalAvailable * 0.995; // Fee model: buyer sees 99.5% of locked amount
     const isBuy = order.type === 'buy';
 
     return (
