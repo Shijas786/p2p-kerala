@@ -46,10 +46,11 @@ declare global {
 function validateInitData(req: Request, res: Response, next: NextFunction) {
     const initData = req.headers["x-telegram-init-data"] as string;
 
-    // Dev mode bypass
+    // Dev mode bypass — ONLY when explicitly in development AND no init data provided
     if (!initData && env.NODE_ENV === "development") {
+        console.warn("[AUTH] ⚠️ DEV MODE BYPASS: Using test user. NEVER deploy with NODE_ENV=development!");
         req.telegramUser = {
-            id: 723338915, // Match real user Cryptowolf07 for testing
+            id: 723338915,
             first_name: "Cryptowolf07",
             username: "Cryptowolf07",
         };
