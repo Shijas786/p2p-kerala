@@ -1,5 +1,6 @@
 import { db } from "../db/client";
 import { env } from "../config/env";
+import { deleteAdBroadcasts } from "../bot";
 
 export function startExpiryJob() {
     console.log("⏰ Starting Ad Expiry Job...");
@@ -9,17 +10,35 @@ export function startExpiryJob() {
         try {
             const now = new Date().toISOString();
             const client = (db as any).getClient(); 
-            const { data: expiredOrders, error } = await client
-                .from("orders")
-                .update({ status: "expired", updated_at: now })
-                .eq("status", "active")
-                .lt("expires_at", now)
-                .select("id");
-
-            if (error) throw error;
             
-            if (expiredOrders && expiredOrders.length > 0) {
-                console.log(`[JOB] Auto-expired ${expiredOrders.length} ads: ${expiredOrders.map((o: any) => o.id).join(", ")}`);
+            // Get ads that ARE about to expire
+            const { data: toExpire, error: fetchError } = await client
+                .from("orders")
+                .select("id")
+                .eq("status", "active")
+                .lt("expires_at", now);
+
+            if (fetchError) throw fetchError;
+
+            if (toExpire && toExpire.length > 0) {
+                const ids = toExpire.map((o: any) => o.id);
+                
+                // Update status in bulk
+                const { error: updateError } = await client
+                    .from("orders")
+                    .update({ status: "expired", updated_at: now })
+                    .in("id", ids);
+
+                if (updateError) throw updateError;
+
+                console.log(`[JOB] Auto-expired ${ids.length} ads. Cleaning up broadcasts...`);
+
+                // Trigger cleanup for each
+                for (const id of ids) {
+                    deleteAdBroadcasts(id).catch(err => {
+                        console.error(`[JOB] Failed to cleanup broadcasts for order ${id}:`, err);
+                    });
+                }
             }
         } catch (err) {
             console.error("[JOB] Expiry job error:", err);
