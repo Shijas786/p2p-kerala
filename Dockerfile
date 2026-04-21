@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:20
 
 WORKDIR /app
 
@@ -6,15 +6,13 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
-# Copy all source files
+# Copy everything else (leveraging dockerignore)
 COPY . .
 
 # Build the miniapp
 WORKDIR /app/miniapp
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-RUN npm install @rollup/rollup-linux-x64-gnu --no-save || true
+RUN rm -rf node_modules package-lock.json && npm install --legacy-peer-deps
 RUN npm run build
-
 
 # Build the backend
 WORKDIR /app
@@ -25,4 +23,3 @@ EXPOSE 8000
 
 # Start the server
 CMD ["node", "--max-old-space-size=384", "dist/index.js"]
-
