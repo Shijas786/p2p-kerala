@@ -162,13 +162,6 @@ export async function broadcastTradeSuccess(trade: any, order: any) {
         ].join("\n");
 
         await broadcast(msg);
-
-        // Cleanup the original ad broadcast if it was tied to an order
-        if (order?.id) {
-            deleteAdBroadcasts(order.id).catch(err => {
-                console.error("[BOT] Failed to cleanup broadcasts on success:", err);
-            });
-        }
     } catch (e) {
         console.error("BroadcastSuccess error:", e);
     }
