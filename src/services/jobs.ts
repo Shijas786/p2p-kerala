@@ -61,7 +61,7 @@ export function startExpiryJob() {
                     // Exception: we keep 'filled' ads as proof (user request)
                     if (!order || (order.status !== 'active' && order.status !== 'filled')) {
                         console.log(`[JOB] Cleaning up orphaned broadcasts for order ${orderId} (Status: ${order?.status || 'deleted'})`);
-                        deleteAdBroadcasts(orderId).catch(() => {});
+                        deleteAdBroadcasts(orderId as string).catch(() => {});
                     }
                 }
             }
