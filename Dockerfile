@@ -11,8 +11,7 @@ COPY . .
 
 # Build the miniapp
 WORKDIR /app/miniapp
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-RUN npm install @rollup/rollup-linux-x64-gnu --no-save || true
+RUN rm -rf node_modules package-lock.json && npm install --legacy-peer-deps
 RUN npm run build
 
 
