@@ -115,7 +115,7 @@ async function broadcast(message: string, keyboard?: InlineKeyboard): Promise<{ 
 
                 if (attempts >= maxAttempts) {
                     console.error(`⚠️ Broadcast FAILED to ${chatId} after ${maxAttempts} attempts:`, error.message);
-                    return;
+                    return null;
                 }
 
                 const delay = 1000 * attempts;
@@ -123,7 +123,14 @@ async function broadcast(message: string, keyboard?: InlineKeyboard): Promise<{ 
                 await new Promise(r => setTimeout(r, delay));
             }
         }
+        return null;
     }));
+
+    return results
+        .filter((r): r is PromiseFulfilledResult<{ chatId: number; messageId: number }> => 
+            r.status === 'fulfilled' && r.value !== null
+        )
+        .map(r => r.value);
 }
 
 
