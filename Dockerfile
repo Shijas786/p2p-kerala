@@ -11,7 +11,9 @@ COPY . .
 
 # Build the miniapp
 WORKDIR /app/miniapp
+RUN rm -rf node_modules package-lock.json
 RUN npm install --legacy-peer-deps
+
 RUN npm run build
 
 
