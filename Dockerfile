@@ -4,15 +4,16 @@ WORKDIR /app
 
 # Install dependencies for main project
 COPY package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy all source files
 COPY . .
 
 # Build the miniapp
 WORKDIR /app/miniapp
-RUN npm install
+RUN npm install --legacy-peer-deps
 RUN npm run build
+
 
 # Build the backend
 WORKDIR /app
